@@ -1,0 +1,16 @@
+[Unit]
+Description=Jellyfin Compose Stack
+Requires=docker.service
+After=docker.service
+RequiresMountsFor=/mnt/media/Media/Movies /mnt/media/Media/Shows /mnt/internal-hdd/MOVIES
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+WorkingDirectory=/opt/homelab/jellyfin
+ExecStart=/usr/bin/docker compose up -d
+ExecStop=/usr/bin/docker compose stop
+TimeoutStartSec=0
+
+[Install]
+WantedBy=multi-user.target
