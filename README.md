@@ -7,12 +7,13 @@ Infrastructure configuration and operating documentation for the always-on Ubunt
 - Portainer CE — `portainer/compose.yaml`
 - Jellyfin — `jellyfin/compose.yaml`
 - Navidrome — `navidrome/compose.yaml`
+- Pi-hole — `pihole/compose.yaml` (prepared; requires reserved LAN IP before start).
 - Immich v3.1.0 — `immich/compose.yaml` (started on Linux using the One Touch HDD at `/mnt/immich`; database restore count checks passed).
   - Guarded deployment script: `immich/bootstrap-linux.sh` (backs up fstab, switches the One Touch mount to read-write, restores the October 17 database dump to a fresh production DB directory, verifies counts, then starts Immich).
 
 Systemd startup units for Jellyfin and Navidrome are stored under `systemd/`.
 
-Immich's Linux Compose project in `immich/compose.yaml` is running from the existing One Touch HDD at `/mnt/immich`, with its UUID verified and mount set read-write for uploads. The October 17 database backup was restored into the Linux PostgreSQL directory and key counts passed. The Windows Immich server remains stopped while Linux Immich is active. The internal Seagate has repeatedly failed SATA reads/writes and is not currently usable as the planned mirror/cloud-storage target. Pi-hole and Nextcloud Compose definitions are not present in the current repository snapshot.
+Immich's Linux Compose project in `immich/compose.yaml` is running from the existing One Touch HDD at `/mnt/immich`, with its UUID verified and mount set read-write for uploads. The October 17 database backup was restored into the Linux PostgreSQL directory and key counts passed. The Windows Immich server remains stopped while Linux Immich is active. The internal Seagate has repeatedly failed SATA reads/writes and is not currently usable as the planned mirror/cloud-storage target. Pi-hole Compose is prepared in `pihole/compose.yaml`; do not switch router DNS until its reserved LAN IP, DNS resolution, and admin UI have been tested. Nextcloud Compose is not present in the current repository snapshot.
 
 ## Operating principles
 
@@ -30,6 +31,7 @@ Immich's Linux Compose project in `immich/compose.yaml` is running from the exis
 - [Server inventory and target architecture](docs/server-inventory.md) — host, disks, services, data sources, and planned storage roles.
 - [Migration status and acceptance gates](docs/migration-status.md) — conditions required before starting the Immich migration.
 - [Immich Linux migration runbook](docs/immich-linux-migration-runbook.md) — commands, database backup/restore results, storage layout, guarded bootstrap procedure and current blockers.
+- [Pi-hole setup runbook](docs/pihole-setup-runbook.md) — DNS deployment, DHCP/router rollout, mobile/TV device behavior, tests and rollback.
 
 ## Current hold
 
