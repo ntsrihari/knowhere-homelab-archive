@@ -37,6 +37,13 @@
 
 **Next database gate:** run the same safe count queries against the source database or another trusted source-side report, and compare schema/migration versions. Do not start the Linux Immich application against this temporary database and do not use it as the production database.
 
+## Fresh database backup and repeat storage failure — 2026-10-17
+
+- A fresh custom-format PostgreSQL dump was created from the Windows `immich_postgres` container, copied to `/home/srihari/immich-current-20261017.dump` on `knowhere`, and restored successfully in isolated container `immich-current-restore-test-pg` using a separate named volume `immich-current-restore-data`.
+- Fresh restore key counts match the current Windows source report: `asset=28149`, `album=38`, `album_asset=7212`, `asset_file=57572`, `integrity_report=72282`, `kysely_migrations=88`; all 64 foreign-key constraints are validated. Restore database size: 580 MB. The test container has no network and no published ports. Retain the container and volume for now.
+- A second serial-identified format attempt on Seagate serial `WL114BWW` created partition/filesystem structures and printed UUID `8f43756c-4fcf-4b0e-ba43-f77beb4c905f`, but `mke2fs` failed on final filesystem accounting writes with `Input/output error`. A usable ext4 filesystem and `/srv/storage` mount are not confirmed. The SSH session closed immediately afterward; host reboot/crash status is unknown.
+- No further writes or mount attempts against this Seagate. Next step is read-only host/kernel log inspection to determine whether the host rebooted and collect current/previous-boot SATA errors.
+
 ## Blocked work
 
 - Diagnose the SATA command/link failure and determine whether the cause is drive, connection/power, controller/port or software interaction.
