@@ -16,7 +16,6 @@ services:
     volumes:
       - navidrome_data:/data
       - /mnt/media/Media/Music:/music/ssd:ro
-      - /mnt/internal-hdd/MUSIC:/music/hdd:ro
 
 volumes:
   navidrome_data:
