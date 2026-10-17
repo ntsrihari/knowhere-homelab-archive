@@ -9,7 +9,7 @@
 - Repository clone previously reported at `/opt/homelab`.
 - Checked-in Compose projects: Portainer CE, Jellyfin and Navidrome.
 - Jellyfin and Navidrome have systemd startup units.
-- The current Windows Docker Desktop/WSL2 Immich instance is the source of truth while migration is pending.
+- The original Windows PostgreSQL container `immich_postgres` is preserved; the Windows `immich_server` application container was stopped after its I: drive paths became unavailable.
 - One Touch external 1 TB HDD with serial `00000000NACNBMA9` was last observed at `/mnt/immich`.
 - Kingston external 512 GB SSD with serial `50026B7684B4198D` was last observed at `/mnt/media`.
 - Internal Seagate 1 TB HDD serial `WL114BWW` had a failed ext4 format attempt, SATA link failures, and subsequent SMART findings of 31,440 reallocated sectors, 104 pending sectors and 104 offline-uncorrectable sectors. It is not an approved primary-storage destination; replace it or use another verified healthy disk.
@@ -40,6 +40,7 @@
 ## Fresh database backup and repeat storage failure — 2026-10-17
 
 - A fresh custom-format PostgreSQL dump was created from the Windows `immich_postgres` container, copied to `/home/srihari/immich-current-20261017.dump` on `knowhere`, and restored successfully in isolated container `immich-current-restore-test-pg` using a separate named volume `immich-current-restore-data`.
+- Linux Immich Compose, an example environment file, a guarded systemd unit, and a guarded bootstrap script were committed. See [the Immich Linux migration runbook](immich-linux-migration-runbook.md). The bootstrap script has not yet been run; no Linux production Immich container or production database restore has been started.
 - Fresh restore key counts match the current Windows source report: `asset=28149`, `album=38`, `album_asset=7212`, `asset_file=57572`, `integrity_report=72282`, `kysely_migrations=88`; all 64 foreign-key constraints are validated. Restore database size: 580 MB. The test container has no network and no published ports. Retain the container and volume for now.
 - A second serial-identified format attempt on Seagate serial `WL114BWW` created partition/filesystem structures and printed UUID `8f43756c-4fcf-4b0e-ba43-f77beb4c905f`, but `mke2fs` failed on final filesystem accounting writes with `Input/output error`. A usable ext4 filesystem and `/srv/storage` mount are not confirmed. The SSH session closed immediately afterward; host reboot/crash status is unknown.
 - No further writes or mount attempts against this Seagate. Next step is read-only host/kernel log inspection to determine whether the host rebooted and collect current/previous-boot SATA errors.
@@ -72,4 +73,4 @@
 - Do not format or alter the One Touch HDD or Kingston SSD.
 - Do not configure an automatic mirror to the Seagate until it can reliably write and read data.
 - Avoid rebooting or changing boot/kernel settings remotely without an explicit maintenance window and recovery access.
-- Keep the Windows Immich instance running/available as the source of truth, where operationally possible.
+- Keep Windows `immich_postgres`, its Docker volume, and the source media data preserved. Leave the Windows `immich_server` stopped while Linux Immich is activated.
