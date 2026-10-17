@@ -46,4 +46,4 @@ Inspect services and mounts with systemctl status and findmnt. Validate /etc/fst
 
 The current Compose files and systemd units still reference /mnt/internal-hdd; revisit these paths only after the storage incident is resumed and the final storage path is safely established. Missing-drive behaviour needs an explicit safeguard so a container cannot silently write into an empty mountpoint on the OS disk.
 
-See docs/incidents/2026-10-16-seagate-sata-io-failure.md if present, and keep the storage/Immich migration on hold until explicitly resumed.
+See [the incident record](incidents/2026-10-16-seagate-sata-io-failure.md), [the server inventory](server-inventory.md), and [migration status](migration-status.md). Storage and Immich migration remain on hold until explicitly resumed.
