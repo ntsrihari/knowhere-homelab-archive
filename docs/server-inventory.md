@@ -31,8 +31,12 @@ Always identify disks by model and serial. Linux device letters have changed dur
 |---|---|---|---|---|---|
 | `/dev/sda` | One Touch w/PW | `00000000NACNBMA9` | 931.5 GiB | exFAT, label One Touch, UUID `AD95-6C91`, mounted `/mnt/immich` | External 1 TB HDD with current Windows Immich data. Preserve unchanged. |
 | `/dev/sdb` | Crucial CT500BX500SSD1 | `2239E66F361E` | 465.8 GiB | EFI UUID `63F9-F146` at `/boot/efi`; ext4 UUID `d45b5f35-b38d-4de2-85cf-bd9c0f096e56` at `/boot`; LVM PV with 100 GB root LV UUID `759c7ad4-7d3e-43ec-8520-d396fb9a2abc` mounted at `/` | Ubuntu OS and intended Docker/config/database SSD. Do not format. |
-| `/dev/sdc` | Seagate ST1000LM048-2E7172 / ST1000LM048-2E71 | `WL114BWW` | 931.5 GiB | `/dev/sdc1` present; no recognized filesystem/UUID/mountpoint | Intended internal primary bulk storage; failed format/SATA incident is on hold. |
+| `/dev/sdc` | Seagate ST1000LM048-2E7172 / ST1000LM048-2E71 | `WL114BWW` | 931.5 GiB | `/dev/sdc1` present; no recognized filesystem/UUID/mountpoint | Do not use for primary photos or backups. SMART has 31,440 reallocated sectors, 104 pending sectors and 104 offline-uncorrectable sectors. |
 | `/dev/sdd` | KINGSTON SNVS500G | `50026B7684B4198D` | 465.8 GiB | 16 MB partition and NTFS partition UUID `D09481079480F0F0`, label Kingston 500GB, mounted `/mnt/media` | External 512 GB SSD with an older Immich dataset, media, Nextcloud data and other files. Preserve unchanged. |
+
+### Seagate SMART findings — 2026-10-17
+
+After physical reconnection, `smartctl -x /dev/sdc` responded and reported the matching model/serial. Despite the overall SMART status `PASSED`, key counters are serious: reallocated sectors (attribute 5) = 31,440; current pending sectors (197) = 104; offline uncorrectable (198) = 104; reported uncorrectable raw value (187) = 38; power-on hours = 17,793; temperature = 31 C; UDMA CRC error count (199) = 0. The SMART self-test log contained no tests. These values do not prove the root cause of the SATA link loss, but they are sufficient to reject this disk as a trusted primary photo/backup target. See the full [incident record](incidents/2026-10-16-seagate-sata-io-failure.md).
 
 Historical internal disk state before the incident: Seagate was NTFS UUID `8ABA4CF5BA4CDF77`, label reported as 1TB HDD, mounted `/mnt/internal-hdd`. That UUID is now stale and must not be used as the current filesystem ID.
 
