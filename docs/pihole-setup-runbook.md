@@ -2,20 +2,20 @@
 
 **Target:** `knowhere` Ubuntu / Docker Compose  
 **Pi-hole generation:** v6 (official `pihole/pihole:latest` image)  
-**Status:** Pi-hole is running and passed host-side DNS/HTTP health checks on 2026-10-17 at `192.168.29.68`. The user will not change router configuration; clients must be configured individually. This address is currently DHCP-assigned and could change, so per-device settings may need updating if `knowhere` receives a different address.
+**Status:** Pi-hole is running and passed host-side DNS/HTTP health checks on 2026-10-17 at LAN IP `192.168.29.68`. The user will not change router configuration; local clients will be configured individually and Tailscale clients can use the server's Tailscale IP. Pi-hole Compose is being extended to bind DNS/admin only on LAN and Tailscale addresses. The LAN IP is currently DHCP-assigned and can change.
 
 Pi-hole Docker v6 uses `FTLCONF_...` environment variables. This configuration follows the official Docker quick-start structure and v6 configuration method: [Pi-hole Docker docs](https://docs.pi-hole.net/docker/) and [Docker configuration docs](https://docs.pi-hole.net/docker/configuration/).
 
 ## Intended design
 
-- `pihole/compose.yaml`: Pi-hole; DNS TCP/UDP 53 bound only to the configured LAN IP.
+- `pihole/compose.yaml`: Pi-hole; DNS TCP/UDP 53 and admin HTTP bound separately to the configured LAN IP and Tailscale IP (not to a wildcard host address).
 - Web admin: `http://<KNOWHERE-LAN-IP>:8081/admin`. Port 8081 avoids collisions with existing services.
 - Persistent FTL/Pi-hole data: `/srv/appdata/pihole/etc-pihole` on the OS SSD.
 - Upstream resolvers: Cloudflare `1.1.1.1` and Quad9 `9.9.9.9`.
 - LAN DHCP remains on the home router. **Do not enable Pi-hole DHCP** as part of this setup.
-- Keep DNS ports bound to the LAN address only. Do not set router port-forwarding for DNS or the Pi-hole admin page.
+- Bind DNS/admin only to the LAN address and Tailscale address. Do not set router port-forwarding for DNS or the Pi-hole admin page.
 - The user will not change router configuration. Configure DNS manually on each target client. The server address is a DHCP lease; if it changes, device DNS settings must be updated. Never assume the current IP will remain stable.
-- The current service does not configure itself as a public/remote DNS service.
+- No router changes are required. Local-only devices point to `192.168.29.68`; remote devices with Tailscale use `100.104.30.99` or the tailnet's global nameserver setting. No port-forwarding or public DNS exposure is intended.
 
 ## Observed LAN state — 2026-10-17
 
@@ -43,6 +43,21 @@ Observed from the first `docker compose up -d`:
 - Initialization created its persistent gravity database and downloaded the default StevenBlack hosts source successfully: 73,634 unique gravity domains.
 - Pi-hole log reported `DNS resolution is available` inside the container and then started FTL. At the recorded snapshot, Docker still reported `health: starting`; no successful client-side `dig`/`nslookup` or browser sign-in has yet been reported.
 - The server IP remains a DHCP address until the user confirms a reservation in the router.
+
+## Tailscale reachability (no router change)
+
+A previous SSH connection resolved `knowhere` as `100.104.30.99`; always confirm the active Tailscale address with `tailscale ip -4` before adding it to local `pihole/.env`.
+
+- Pi-hole LAN endpoint: DNS `192.168.29.68:53`; admin `http://192.168.29.68:8081/admin`.
+- Pi-hole Tailscale endpoint: DNS `100.104.30.99:53` (verify current address); admin `http://100.104.30.99:8081/admin`.
+- The Compose file binds host ports on both explicit host addresses. It must not publish DNS or admin on `0.0.0.0`.
+- The server's Tailscale service must be up before the Compose container starts; the systemd unit requires `tailscaled.service` and checks the configured IP. After updating the `.env`, install and enable the unit so boot order is predictable.
+
+### Configure Tailscale clients without touching the router
+
+For devices that have Tailscale and should use Pi-hole both at home and away, the reliable central option is to add `100.104.30.99` as a **Global nameserver** in the Tailscale admin console → DNS. Keep MagicDNS enabled. Test it on one device before enabling **Override DNS servers** for the full tailnet; that override makes Tailscale devices use the tailnet-defined nameservers instead of their local DNS. Only do this after Pi-hole responds on the Tailscale IP and the device can reach it. Official docs: [DNS in Tailscale](https://tailscale.com/docs/reference/dns-in-tailscale) and [MagicDNS](https://tailscale.com/docs/features/magicdns).
+
+For devices that must be configured only locally (such as most Smart TVs and consoles without Tailscale), set their DNS manually to `192.168.29.68`. These devices will use Pi-hole only while on the home LAN. If `knowhere`'s DHCP address changes, the manual entries need updating because router reservations are not being configured.
 
 ## 1. Detect LAN IP, gateway, and port conflicts (read-only)
 
@@ -84,7 +99,8 @@ nano pihole/.env
 ```
 
 In `pihole/.env`, replace:
-- `PIHOLE_IP=REPLACE_WITH_STATIC_LAN_IP` with the reserved IPv4 address of `knowhere`.
+- `PIHOLE_IP=REPLACE_WITH_LAN_IP` with the currently assigned LAN IPv4 (`192.168.29.68` unless changed).
+- `PIHOLE_TAILSCALE_IP=REPLACE_WITH_TAILSCALE_IP` with the output of `tailscale ip -4` on `knowhere` (previously observed as `100.104.30.99`).
 - `PIHOLE_PASSWORD=REPLACE_WITH_RANDOM_PASSWORD` with the output of `openssl rand -hex 24`.
 
 Do not paste or commit the real password. The repository ignores `.env`.
@@ -103,7 +119,7 @@ ip -o -4 address show | awk '{print $4}' | cut -d/ -f1 | grep -Fx "$PIHOLE_IP"
 docker compose config -q
 ```
 
-If the IP check prints no result, stop. Fix the reservation/address first. Verify with `ss` that no conflicting service already owns the selected IP's port 53 or port 8081.
+If either IP check prints no result, stop and correct the local `.env` values. The user is not changing router configuration; the LAN address remains a DHCP lease and may need to be changed on devices if it changes. Verify with `ss` that no conflicting service already owns the selected IP's port 53 or port 8081.
 
 Then start:
 
@@ -211,7 +227,7 @@ For other devices, a query visible in Pi-hole's Query Log is the strongest quick
 ## Security and recovery notes
 
 - Do not forward ports 53, 80, 443 or 8081 from the WAN to `knowhere`.
-- The compose file binds ports to `PIHOLE_IP`, not all host addresses. Pi-hole v6 uses `FTLCONF_dns_listeningMode=ALL` because Docker bridge clients can appear to originate outside the Pi-hole container's local subnet; the host-side bind must remain LAN-IP-specific and firewall exposure must stay LAN-only.
+- The compose file binds host ports separately to `PIHOLE_IP` and `PIHOLE_TAILSCALE_IP`, not to all host addresses. Pi-hole v6 uses `FTLCONF_dns_listeningMode=ALL` because Docker bridge clients can appear to originate outside the Pi-hole container's local subnet; host port binding is limited to the LAN and Tailscale addresses. Do not add router port-forwarding.
 - The password is local-only in `pihole/.env`, not in Git.
 - Pi-hole provides DNS-based filtering, not a universal ad blocker; some apps and video platforms embed ads or use other DNS/HTTPS pathways.
 - If Pi-hole goes down after router DNS is changed, restore prior router DHCP DNS or temporarily set a known working DNS server on the affected client.
