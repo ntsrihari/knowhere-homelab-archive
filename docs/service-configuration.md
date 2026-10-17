@@ -81,7 +81,7 @@ File: [pihole/compose.yaml](../pihole/compose.yaml); based on the official Pi-ho
 - Router remains the DHCP server; Pi-hole DHCP is not enabled.
 - Web password and IP are stored in local `pihole/.env`, never commit that file.
 - Startup unit: [systemd/homelab-pihole.service](../systemd/homelab-pihole.service), depends on Docker and `tailscaled.service` and validates that both configured IP addresses are present plus the persistent directory exists before running Compose.
-- Current LAN candidate `192.168.29.68`; previously observed Tailscale address for `knowhere` was `100.104.30.99` and must be re-confirmed with `tailscale ip -4`. Docker reported `running / healthy`, FTL listens on TCP/UDP 53 and blocking is enabled. `dig @192.168.29.68 example.com` returned `NOERROR`; admin route returned HTTP 302. Interactive admin login, IP reservation and router/client DNS tests remain pending.
+- LAN address is currently `192.168.29.68`; previously observed Tailscale address is `100.104.30.99`, which must be re-confirmed with `tailscale ip -4`. The running container was tested healthy with DNS resolving on the LAN address. Compose is now configured for both explicit IPs, but it must be recreated after adding `PIHOLE_TAILSCALE_IP` to local `pihole/.env`; Tailnet query testing remains pending. Router settings intentionally remain unchanged.
 
 See the [Pi-hole setup runbook](pihole-setup-runbook.md) for dual LAN/Tailscale bindings, per-device DNS settings, tailnet DNS options and rollback.
 
