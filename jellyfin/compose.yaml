@@ -14,7 +14,6 @@ services:
       - jellyfin_cache:/cache
       - /mnt/media/Media/Movies:/media/ssd-movies:ro
       - /mnt/media/Media/Shows:/media/shows:ro
-      - /mnt/internal-hdd/MOVIES:/media/hdd-movies:ro
 
 volumes:
   jellyfin_config:
