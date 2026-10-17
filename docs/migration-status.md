@@ -1,7 +1,7 @@
 # Migration Status and Acceptance Gates
 
 **As of:** 2026-10-17  
-**Status:** Immich deployment prepared; activation must use the One Touch HDD. Seagate mirror/cloud storage remains blocked by repeated SATA I/O failures.
+**Status:** Linux Immich Compose stack started on 2026-10-17 using the existing One Touch HDD. Database restore count checks passed. Confirm UI/login and asset browsing; Seagate mirror/cloud storage remains blocked by repeated SATA I/O failures.
 
 ## Existing system
 
@@ -9,8 +9,8 @@
 - Repository clone previously reported at `/opt/homelab`.
 - Checked-in Compose projects: Portainer CE, Jellyfin and Navidrome.
 - Jellyfin and Navidrome have systemd startup units.
-- The original Windows PostgreSQL container `immich_postgres` is preserved; the Windows `immich_server` application container was stopped after its I: drive paths became unavailable.
-- One Touch external 1 TB HDD with serial `00000000NACNBMA9` was last observed at `/mnt/immich`.
+- The original Windows PostgreSQL container `immich_postgres` and its volume are preserved. The Windows `immich_server` application container remains stopped while Linux Immich is active.
+- One Touch external 1 TB HDD with serial `00000000NACNBMA9`, UUID `AD95-6C91`, is now mounted read-write at `/mnt/immich` for Linux Immich. Bootstrap observed 829 GB used and 104 GB free (89% used).
 - Kingston external 512 GB SSD with serial `50026B7684B4198D` was last observed at `/mnt/media`.
 - Internal Seagate 1 TB HDD serial `WL114BWW` had a failed ext4 format attempt, SATA link failures, and subsequent SMART findings of 31,440 reallocated sectors, 104 pending sectors and 104 offline-uncorrectable sectors. It is not an approved primary-storage destination; replace it or use another verified healthy disk.
 
@@ -40,17 +40,27 @@
 ## Fresh database backup and repeat storage failure — 2026-10-17
 
 - A fresh custom-format PostgreSQL dump was created from the Windows `immich_postgres` container, copied to `/home/srihari/immich-current-20261017.dump` on `knowhere`, and restored successfully in isolated container `immich-current-restore-test-pg` using a separate named volume `immich-current-restore-data`.
-- Linux Immich Compose, an example environment file, a guarded systemd unit, and a guarded bootstrap script were committed. See [the Immich Linux migration runbook](immich-linux-migration-runbook.md). The bootstrap script has not yet been run; no Linux production Immich container or production database restore has been started.
+- Linux Immich Compose, environment template, guarded systemd unit, bootstrap script, and full [migration runbook](immich-linux-migration-runbook.md) are committed. Bootstrap completed: production PostgreSQL was restored and passed key count checks; the systemd unit was enabled and the server, machine-learning, and Valkey containers started. At the initial snapshot PostgreSQL was healthy; app/ML/Valkey were still `health: starting`. UI/login and asset browsing remain to be confirmed.
 - Fresh restore key counts match the current Windows source report: `asset=28149`, `album=38`, `album_asset=7212`, `asset_file=57572`, `integrity_report=72282`, `kysely_migrations=88`; all 64 foreign-key constraints are validated. Restore database size: 580 MB. The test container has no network and no published ports. Retain the container and volume for now.
 - A second serial-identified format attempt on Seagate serial `WL114BWW` created partition/filesystem structures and printed UUID `8f43756c-4fcf-4b0e-ba43-f77beb4c905f`, but `mke2fs` failed on final filesystem accounting writes with `Input/output error`. A usable ext4 filesystem and `/srv/storage` mount are not confirmed. The SSH session closed immediately afterward; host reboot/crash status is unknown.
 - No further writes or mount attempts against this Seagate. Next step is read-only host/kernel log inspection to determine whether the host rebooted and collect current/previous-boot SATA errors.
+
+## Production Immich bootstrap — 2026-10-17
+
+- Script run: `/opt/homelab/immich/bootstrap-linux.sh`; command completed without an error return.
+- `/etc/fstab` backup: `/etc/fstab.pre-immich-20261017-141645-15175`.
+- One Touch UUID `AD95-6C91` at `/mnt/immich` changed from `ro` to `rw`; the script's temporary write check succeeded and removed its temporary file.
+- Production DB restored from `/home/srihari/immich-current-20261017.dump` into `/srv/appdata/immich/postgres`.
+- Key counts verified: `asset=28149`, `album=38`, `album_asset=7212`, `asset_file=57572`, `integrity_report=72282`, `kysely_migrations=88`; 64 foreign keys, zero unvalidated.
+- `homelab-immich.service` installed and enabled. Containers `immich_server`, `immich_machine_learning`, `immich_redis`, and `immich_postgres` started. Initial observation: PostgreSQL healthy; other three were `health: starting`; API and microservices logged successful startup. Browser login and assets remain to be checked.
+- Do not rerun bootstrap without inspecting state; it deliberately refuses to reuse existing production containers/database files.
 
 ## Blocked work
 
 - Diagnose the SATA command/link failure and determine whether the cause is drive, connection/power, controller/port or software interaction.
 - Do not use the Seagate for irreplaceable data. Decide replacement/alternate primary storage; preserve the incident findings in the incident record.
 - Do not retry format or stress tests on the Seagate as part of the Immich migration.
-- One Touch HDD is the intended Immich primary location for now: `/mnt/immich/ImmichData` to container `/data`, with `/mnt/immich/Photos` mapped read-only to `/mnt/photos`. The Linux service must fail closed unless UUID `AD95-6C91` is mounted read-write.
+- One Touch HDD is the active Immich primary location: `/mnt/immich/ImmichData` to container `/data`, with `/mnt/immich/Photos` mapped read-only to `/mnt/photos`. UUID `AD95-6C91` is mounted read-write; the systemd service checks UUID, rw mode, and expected directories.
 - Migrate the PostgreSQL database, managed Immich data and external library to Linux.
 - Verify library references, photo/asset counts, metadata, albums, uploads and database integrity.
 - Configure the portable file-level mirror with safety checks and retention policy.
@@ -73,4 +83,4 @@
 - Do not format or alter the One Touch HDD or Kingston SSD.
 - Do not configure an automatic mirror to the Seagate until it can reliably write and read data.
 - Avoid rebooting or changing boot/kernel settings remotely without an explicit maintenance window and recovery access.
-- Keep Windows `immich_postgres`, its Docker volume, and the source media data preserved. Leave the Windows `immich_server` stopped while Linux Immich is activated.
+- Keep Windows `immich_postgres`, its Docker volume, and source media data preserved. Leave the Windows `immich_server` stopped while Linux Immich is active.
