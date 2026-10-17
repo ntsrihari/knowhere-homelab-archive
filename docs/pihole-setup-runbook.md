@@ -2,7 +2,7 @@
 
 **Target:** `knowhere` Ubuntu / Docker Compose  
 **Pi-hole generation:** v6 (official `pihole/pihole:latest` image)  
-**Status:** Pi-hole is running and passed host-side DNS/HTTP health checks on 2026-10-17 at LAN IP `192.168.29.68`. The user will not change router configuration; local clients will be configured individually and Tailscale clients can use the server's Tailscale IP. Pi-hole Compose is being extended to bind DNS/admin only on LAN and Tailscale addresses. The LAN IP is currently DHCP-assigned and can change.
+**Status:** Pi-hole DNS is answering on both LAN IP `192.168.29.68` and Tailscale IP `100.104.30.99` as of 2026-10-17. Host-side `dig` tests returned `NOERROR` through both IPs; admin HTTP returned `302` through both. The container showed `health: starting` 9 seconds after recreation and requires a later health recheck. The user will not change router configuration; local clients will be configured individually and Tailscale clients can use the server's Tailscale IP. The LAN IP is DHCP-assigned and can change.
 
 Pi-hole Docker v6 uses `FTLCONF_...` environment variables. This configuration follows the official Docker quick-start structure and v6 configuration method: [Pi-hole Docker docs](https://docs.pi-hole.net/docker/) and [Docker configuration docs](https://docs.pi-hole.net/docker/configuration/).
 
@@ -29,12 +29,22 @@ On the server when this runbook was updated:
 
 ## DNS validation record — 2026-10-17
 
-Read-only tests after initialization succeeded:
+Read-only tests after initialization and after enabling the Tailscale binding:
 - Docker state: `running / healthy`.
 - `pihole status`: FTL listening on TCP and UDP port 53; blocking enabled.
 - `dig @192.168.29.68 example.com +time=3 +tries=1`: `NOERROR`, two A records returned, 109 ms.
 - `curl` to `http://192.168.29.68:8081/admin/`: HTTP `302`, a redirect response consistent with the admin route.
 - Not yet confirmed: interactive admin login, DNS query from another LAN client, DHCP reservation, or router-wide DNS cutover.
+
+## Dual-address test after Compose recreation — 2026-10-17
+
+The operator updated the local ignored `.env` with `PIHOLE_IP=192.168.29.68` and `PIHOLE_TAILSCALE_IP=100.104.30.99`, reloaded systemd, and ran the guarded startup service. Observed results:
+- Container status at the 9-second snapshot: `running / starting` (health had not yet gone green at that moment).
+- `dig @192.168.29.68 example.com +time=3 +tries=1`: `NOERROR`, two A records; 17 ms.
+- `dig @100.104.30.99 example.com +time=3 +tries=1`: `NOERROR`, two A records; 3 ms.
+- Admin HTTP response: LAN 302, Tailscale 302.
+- Port listings show DNS TCP/UDP 53 and admin TCP 8081 bound only to `192.168.29.68` and `100.104.30.99`; not to a wildcard host address.
+- These queries were run on `knowhere` itself. A test from a separate Tailscale client has not yet been recorded.
 
 ## First start record — 2026-10-17
 
