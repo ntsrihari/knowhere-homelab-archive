@@ -226,6 +226,34 @@ Then:
 6. Connect and test streaming. Check Pi-hole Admin → Query Log for the Fire TV's requests.
 
 **Static-IP caution:** without a router DHCP reservation, a manually configured IP can eventually conflict with another device. Because you won't change router settings, don't proceed with manual Static IP if you don't know the current values or aren't comfortable accepting that risk. Alternative: install the official Tailscale client on a supported Fire TV model and use the tailnet DNS setup above. Tailscale currently supports many Fire TV devices, but not Fire OS 5/6 or Vega OS, and notes some model exclusions; check its [official Fire TV install guide](https://tailscale.com/docs/install/amazon-fire) before sideloading.
+## Usage-focused blocklists and browser ad blocking
+
+Use a curated main list rather than stacking many overlapping general lists. HaGeZi Multi PRO includes broad ad/tracker/security filtering and full pop-up-ad list coverage. Since the default StevenBlack list is already enabled, add HaGeZi first and confirm Gravity succeeds; then disable/remove StevenBlack if you want to avoid redundant list overlap.
+
+Add under Pi-hole Admin → Adlists (menu naming may vary), then update Gravity:
+
+- Main list: `https://cdn.jsdelivr.net/gh/hagezi/dns-blocklists@latest/adblock/pro.txt`
+- Optional Amazon device/app trackers for Fire TV: `https://cdn.jsdelivr.net/gh/hagezi/dns-blocklists@latest/adblock/native.amazon.txt`
+- Optional extra threat intelligence list: `https://cdn.jsdelivr.net/gh/hagezi/dns-blocklists@latest/adblock/tif.txt` (large, additional phishing/malware/scam coverage; not required for ad blocking).
+
+HaGeZi Multi PRO already includes full Pop-Up Ads list coverage, so a separate popup list is not needed. Do not add HaGeZi's Social Networks list unless the goal is to block access to Facebook/Instagram/TikTok/etc.; it is a service-blocking list, not an in-feed ad filter. DNS filtering generally cannot remove Meta feed ads reliably because ads and content can use shared first-party infrastructure.
+
+**For actual popup/overlay ad hiding in browsers, use a browser content blocker too:**
+
+- Windows/Linux desktop: Firefox with the official uBlock Origin extension (`https://addons.mozilla.org/firefox/addon/ublock-origin/`), or Brave with Shields enabled.
+- Samsung Android browser use: Firefox for Android with uBlock Origin (`https://addons.mozilla.org/android/addon/ublock-origin/`), or Brave with Shields.
+- Do not install multiple content blockers at once. On pirate/streaming sites, never accept push notifications or download/install an alleged video player or codec. A DNS blocker does not remove every popup or overlay rendered by the site itself.
+
+### Computers: is Tailscale alone enough?
+
+Yes, while Tailscale is connected, provided the client accepts Tailscale DNS settings and the tailnet DNS configuration has `100.104.30.99` as the **only global nameserver** with **Override DNS servers ON**. Keep MagicDNS enabled. If Cloudflare/another public resolver is still listed alongside Pi-hole globally, remove it: resolver order is not guaranteed and some queries could bypass Pi-hole.
+
+- Windows: open Tailscale settings and ensure **Use Tailscale DNS settings** is enabled. Keep Tailscale connected. At home, this routes DNS through the tailnet resolver too; away from home, it lets the PC reach Pi-hole at its Tailscale IP.
+- Browser: disable built-in Secure DNS / DNS-over-HTTPS if you want browser DNS to go through Pi-hole. Browser content blocking (uBlock Origin or Brave Shields) can still be useful regardless.
+- Test: open a few sites on the computer and watch Pi-hole Admin → Query Log for fresh queries. A forced lookup like `nslookup example.com 100.104.30.99` proves reachability, but not that every app/browser uses Pi-hole.
+- If Tailscale is disconnected, that computer will stop using the tailnet Pi-hole setting. Without router changes, set DNS manually to `192.168.29.68` on the computer's home network, or leave normal DNS when away from home.
+
+Reference: [Tailscale DNS behavior and override setting](https://tailscale.com/docs/reference/dns-in-tailscale), [HaGeZi blocklists and version guidance](https://github.com/hagezi/dns-blocklists), [uBlock Origin](https://github.com/gorhill/uBlock).
 ## 5. Test one device before rolling out to the rest
 
 1. Configure just one client.
