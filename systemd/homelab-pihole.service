@@ -1,0 +1,17 @@
+[Unit]
+Description=Pi-hole DNS Filtering (Compose)
+Requires=docker.service
+After=docker.service
+RequiresMountsFor=/srv/appdata/pihole/etc-pihole
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+WorkingDirectory=/opt/homelab/pihole
+ExecStartPre=/bin/sh -ec '. ./.env; case "$PIHOLE_IP" in ""|REPLACE_WITH_STATIC_LAN_IP) echo "Set PIHOLE_IP in /opt/homelab/pihole/.env" >&2; exit 1;; esac; /usr/sbin/ip -o -4 addr show | awk "{print \$4}" | cut -d/ -f1 | grep -Fx "$PIHOLE_IP"; test -d /srv/appdata/pihole/etc-pihole'
+ExecStart=/usr/bin/docker compose up -d
+ExecStop=/usr/bin/docker compose stop
+TimeoutStartSec=0
+
+[Install]
+WantedBy=multi-user.target
