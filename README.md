@@ -13,7 +13,7 @@ Infrastructure configuration and operating documentation for the always-on Ubunt
 
 Systemd startup units for Jellyfin and Navidrome are stored under `systemd/`.
 
-Immich's Linux Compose project in `immich/compose.yaml` is running from the existing One Touch HDD at `/mnt/immich`, with its UUID verified and mount set read-write for uploads. The October 17 database backup was restored into the Linux PostgreSQL directory and key counts passed. The Windows Immich server remains stopped while Linux Immich is active. The internal Seagate has repeatedly failed SATA reads/writes and is not currently usable as the planned mirror/cloud-storage target. Pi-hole Compose is prepared in `pihole/compose.yaml`; do not switch router DNS until its reserved LAN IP, DNS resolution, and admin UI have been tested. Nextcloud Compose is not present in the current repository snapshot.
+Immich's Linux Compose project in `immich/compose.yaml` is running from the existing One Touch HDD at `/mnt/immich`, with its UUID verified and mount set read-write for uploads. The October 17 database backup was restored into the Linux PostgreSQL directory and key counts passed. The Windows Immich server remains stopped while Linux Immich is active. The internal Seagate has repeatedly failed SATA reads/writes and is not currently usable as the planned mirror/cloud-storage target. Pi-hole is running at `192.168.29.68`; clients are being configured individually because router settings will not be changed. The address is DHCP-assigned and can change. Nextcloud Compose is not present in the current repository snapshot.
 
 ## Operating principles
 
@@ -31,7 +31,7 @@ Immich's Linux Compose project in `immich/compose.yaml` is running from the exis
 - [Server inventory and target architecture](docs/server-inventory.md) — host, disks, services, data sources, and planned storage roles.
 - [Migration status and acceptance gates](docs/migration-status.md) — conditions required before starting the Immich migration.
 - [Immich Linux migration runbook](docs/immich-linux-migration-runbook.md) — commands, database backup/restore results, storage layout, guarded bootstrap procedure and current blockers.
-- [Pi-hole setup runbook](docs/pihole-setup-runbook.md) — Pi-hole deployment, router DHCP DNS rollout, device guidance, tests and rollback (observed LAN candidate: `192.168.29.68`; reserve before network-wide use).
+- [Pi-hole setup runbook](docs/pihole-setup-runbook.md) — Pi-hole deployment, per-device DNS settings, tests and rollback (current server IP: `192.168.29.68`; router configuration is intentionally left unchanged).
 - [Pi-hole setup runbook](docs/pihole-setup-runbook.md) — DNS deployment, DHCP/router rollout, mobile/TV device behavior, tests and rollback.
 
 ## Current hold
