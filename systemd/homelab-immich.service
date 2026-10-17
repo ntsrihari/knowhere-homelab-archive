@@ -1,0 +1,17 @@
+[Unit]
+Description=Immich Compose Stack
+Requires=docker.service
+After=docker.service
+RequiresMountsFor=/mnt/immich /srv/appdata/immich/postgres
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+WorkingDirectory=/opt/homelab/immich
+ExecStartPre=/bin/sh -ec 'src=$(/usr/bin/findmnt --noheadings --output SOURCE --mountpoint /mnt/immich); [ "$src" = "$(/usr/bin/readlink -f /dev/disk/by-uuid/AD95-6C91)" ]; opts=$(/usr/bin/findmnt --noheadings --output OPTIONS --mountpoint /mnt/immich); case ",$opts," in *,rw,*) ;; *) echo "/mnt/immich must be mounted read-write" >&2; exit 1;; esac; test -d /mnt/immich/ImmichData/library; test -d /mnt/immich/ImmichData/upload; test -d /mnt/immich/Photos; test -d /srv/appdata/immich/postgres'
+ExecStart=/usr/bin/docker compose up -d
+ExecStop=/usr/bin/docker compose stop
+TimeoutStartSec=0
+
+[Install]
+WantedBy=multi-user.target
