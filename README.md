@@ -29,6 +29,7 @@ Immich's Linux Compose project is now prepared in `immich/compose.yaml`. The int
 - [Seagate SATA I/O incident (2026-10-16)](docs/incidents/2026-10-16-seagate-sata-io-failure.md) — failure timeline, diagnostics, and hold status.
 - [Server inventory and target architecture](docs/server-inventory.md) — host, disks, services, data sources, and planned storage roles.
 - [Migration status and acceptance gates](docs/migration-status.md) — conditions required before starting the Immich migration.
+- [Immich Linux migration runbook](docs/immich-linux-migration-runbook.md) — commands, database backup/restore results, storage layout, guarded bootstrap procedure and current blockers.
 
 ## Current hold
 
