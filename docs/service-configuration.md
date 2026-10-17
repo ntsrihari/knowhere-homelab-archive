@@ -68,6 +68,23 @@ File: [immich/compose.yaml](../immich/compose.yaml); based on the official v3.1.
 - The Windows Immich server should remain stopped while Linux is active. Keep the original Windows PostgreSQL database preserved.
 - The internal Seagate intended for mirroring/cloud data has repeat I/O failures and is not currently a usable target. Do not configure a mirror or Nextcloud data directory on it until reliability is addressed.
 
+## Pi-hole
+
+File: [pihole/compose.yaml](../pihole/compose.yaml); based on the official Pi-hole v6 Docker configuration.
+
+- Image: `pihole/pihole:latest`
+- Container: `pihole`
+- DNS TCP/UDP 53 is bound to `PIHOLE_IP` only; set this to a stable, router-reserved LAN address in local `pihole/.env`.
+- Admin UI: `http://PIHOLE_IP:8081/admin`, to avoid collisions with existing services on ports 80/443.
+- Persistent configuration: `/srv/appdata/pihole/etc-pihole` on the Crucial OS SSD.
+- Upstreams: Cloudflare `1.1.1.1` and Quad9 `9.9.9.9`.
+- Router remains the DHCP server; Pi-hole DHCP is not enabled.
+- Web password and IP are stored in local `pihole/.env`, never commit that file.
+- Startup unit: [systemd/homelab-pihole.service](../systemd/homelab-pihole.service), validates `PIHOLE_IP` is present on the host and the persistent directory exists before running Compose.
+- Deployment status: configuration committed, service not yet started pending LAN-IP and port-conflict checks.
+
+See the [Pi-hole setup runbook](pihole-setup-runbook.md) for the exact deployment, DNS test, router rollout, device instructions and rollback.
+
 ## Image pinning and persistent state
 
 The inspected manifests use moving tags `latest` or `lts`, not pinned image digests. Image updates can therefore change the deployed versions. Pinning is a separate maintenance change; do not modify running services as part of the current storage incident hold.
