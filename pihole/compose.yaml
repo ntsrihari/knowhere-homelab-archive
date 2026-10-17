@@ -10,6 +10,9 @@ services:
       - "${PIHOLE_IP:?Set PIHOLE_IP in .env}:53:53/tcp"
       - "${PIHOLE_IP:?Set PIHOLE_IP in .env}:53:53/udp"
       - "${PIHOLE_IP:?Set PIHOLE_IP in .env}:8081:80/tcp"
+      - "${PIHOLE_TAILSCALE_IP:?Set PIHOLE_TAILSCALE_IP in .env}:53:53/tcp"
+      - "${PIHOLE_TAILSCALE_IP:?Set PIHOLE_TAILSCALE_IP in .env}:53:53/udp"
+      - "${PIHOLE_TAILSCALE_IP:?Set PIHOLE_TAILSCALE_IP in .env}:8081:80/tcp"
     environment:
       TZ: Asia/Kolkata
       FTLCONF_webserver_api_password: ${PIHOLE_PASSWORD:?Set PIHOLE_PASSWORD in .env}
