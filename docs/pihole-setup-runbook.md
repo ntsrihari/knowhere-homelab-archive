@@ -2,7 +2,7 @@
 
 **Target:** `knowhere` Ubuntu / Docker Compose  
 **Pi-hole generation:** v6 (official `pihole/pihole:latest` image)  
-**Status:** Compose and systemd files are prepared. Do not point router/device DNS at Pi-hole until its IP, port bindings, web admin, and DNS resolution have been tested.
+**Status:** Pi-hole container started on 2026-10-17 at candidate IP `192.168.29.68`. First initialization downloaded the default StevenBlack hosts list (73,634 domains); DNS and UI tests and router DHCP reservation are still pending. Do not point router/device DNS at Pi-hole until its IP is reserved and service tests pass.
 
 Pi-hole Docker v6 uses `FTLCONF_...` environment variables. This configuration follows the official Docker quick-start structure and v6 configuration method: [Pi-hole Docker docs](https://docs.pi-hole.net/docker/) and [Docker configuration docs](https://docs.pi-hole.net/docker/configuration/).
 
@@ -26,6 +26,14 @@ On the server when this runbook was updated:
 - Ethernet MAC: `50:9a:4c:49:44:9d`
 - `systemd-resolved` DNS listeners are only on loopback (`127.0.0.53:53` and `127.0.0.54:53`); the captured listener check showed no process on host ports 80, 443, or 8081.
 - Candidate Pi-hole IPv4 for DHCP reservation: `192.168.29.68`. Verify reservation in the router before advertising it to LAN clients.
+
+## First start record — 2026-10-17
+
+Observed from the first `docker compose up -d`:
+- Container `pihole` started with ports TCP/UDP 53 bound to `192.168.29.68` and the admin HTTP UI bound on `192.168.29.68:8081`.
+- Initialization created its persistent gravity database and downloaded the default StevenBlack hosts source successfully: 73,634 unique gravity domains.
+- Pi-hole log reported `DNS resolution is available` inside the container and then started FTL. At the recorded snapshot, Docker still reported `health: starting`; no successful client-side `dig`/`nslookup` or browser sign-in has yet been reported.
+- The server IP remains a DHCP address until the user confirms a reservation in the router.
 
 ## 1. Detect LAN IP, gateway, and port conflicts (read-only)
 
