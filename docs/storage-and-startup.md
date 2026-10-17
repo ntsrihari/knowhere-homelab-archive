@@ -44,6 +44,6 @@ sudo systemctl enable homelab-jellyfin.service homelab-navidrome.service
 
 Inspect services and mounts with systemctl status and findmnt. Validate /etc/fstab using sudo findmnt --verify --verbose before rebooting after mount changes.
 
-The current Compose files and systemd units still reference /mnt/internal-hdd; revisit these paths only after the storage incident is resumed and the final storage path is safely established. Missing-drive behaviour needs an explicit safeguard so a container cannot silently write into an empty mountpoint on the OS disk.
+Jellyfin and Navidrome were updated on 2026-10-17 to use only the read-only Kingston mount at /mnt/media; stale /mnt/internal-hdd bind mounts were removed. Their systemd units now verify the mounted filesystem UUID (D09481079480F0F0) and required media directories before starting. The Seagate remains unmounted and must not be used. Before restarting services, verify that /mnt/media/Media/Movies, /mnt/media/Media/Shows, and /mnt/media/Media/Music exist.
 
 See [the incident record](incidents/2026-10-16-seagate-sata-io-failure.md), [the server inventory](server-inventory.md), and [migration status](migration-status.md). Storage and Immich migration remain on hold until explicitly resumed.
