@@ -74,16 +74,16 @@ File: [pihole/compose.yaml](../pihole/compose.yaml); based on the official Pi-ho
 
 - Image: `pihole/pihole:latest`
 - Container: `pihole`
-- DNS TCP/UDP 53 is bound to `PIHOLE_IP` only; set this to a stable, router-reserved LAN address in local `pihole/.env`.
-- Admin UI: `http://PIHOLE_IP:8081/admin`, to avoid collisions with existing services on ports 80/443.
+- DNS TCP/UDP 53 is bound separately to `PIHOLE_IP` (LAN) and `PIHOLE_TAILSCALE_IP` (Tailscale) in local `pihole/.env`; port bindings are not wildcard addresses.
+- Admin UI: `http://PIHOLE_IP:8081/admin` on LAN and `http://PIHOLE_TAILSCALE_IP:8081/admin` over Tailscale, avoiding collisions with existing services on ports 80/443.
 - Persistent configuration: `/srv/appdata/pihole/etc-pihole` on the Crucial OS SSD.
 - Upstreams: Cloudflare `1.1.1.1` and Quad9 `9.9.9.9`.
 - Router remains the DHCP server; Pi-hole DHCP is not enabled.
 - Web password and IP are stored in local `pihole/.env`, never commit that file.
-- Startup unit: [systemd/homelab-pihole.service](../systemd/homelab-pihole.service), validates `PIHOLE_IP` is present on the host and the persistent directory exists before running Compose.
-- Current LAN candidate `192.168.29.68`; Docker reports `running / healthy`, FTL listens on TCP/UDP 53 and blocking is enabled. `dig @192.168.29.68 example.com` returned `NOERROR`; admin route returned HTTP 302. Interactive admin login, IP reservation and router/client DNS tests remain pending.
+- Startup unit: [systemd/homelab-pihole.service](../systemd/homelab-pihole.service), depends on Docker and `tailscaled.service` and validates that both configured IP addresses are present plus the persistent directory exists before running Compose.
+- Current LAN candidate `192.168.29.68`; previously observed Tailscale address for `knowhere` was `100.104.30.99` and must be re-confirmed with `tailscale ip -4`. Docker reported `running / healthy`, FTL listens on TCP/UDP 53 and blocking is enabled. `dig @192.168.29.68 example.com` returned `NOERROR`; admin route returned HTTP 302. Interactive admin login, IP reservation and router/client DNS tests remain pending.
 
-See the [Pi-hole setup runbook](pihole-setup-runbook.md) for the exact deployment, DNS test, router rollout, device instructions and rollback.
+See the [Pi-hole setup runbook](pihole-setup-runbook.md) for dual LAN/Tailscale bindings, per-device DNS settings, tailnet DNS options and rollback.
 
 ## Image pinning and persistent state
 
