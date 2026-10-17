@@ -29,6 +29,9 @@
 - Extension versions observed: `cube 1.5`, `earthdistance 1.1`, `pg_trgm 1.6`, `unaccent 1.1`, `uuid-ossp 1.1`, `vchord 0.4.3`, `vector 0.8.1`
 - Public table count: 66
 - Restored row counts: `asset=28114`, `album=38`, `album_asset=7212`, `asset_metadata=0`, `library=1`, `activity=0`, `partner=0`, `kysely_migrations=88`
+- Foreign-key check: 64 total foreign-key constraints; 0 unvalidated.
+- The separate table-count query completed successfully for all 66 public tables. Highest row counts: `geodata_places=227901`, `asset_ocr=147209`, `asset_file=57502`, `asset=28114`, `asset_exif=28113`, `asset_job_status=28113`, `smart_search=27867`, `asset_face=26852`, `face_search=26852`, `ocr_search=10933`; `album_asset=7212`; `kysely_migrations=88`; `album=38`; `user=1`; `library=1`.
+- Other zero-row tables observed include `asset_metadata`, `activity`, `partner`, `shared_link`, `stack`, `video_stream_session`, and various audit tables. These are not declared failures until compared against the source's actual schema/data state.
 - The zero-row tables are observations to compare against the source database; they are not currently declared failures.
 - Test resources are intentionally retained pending review: do not remove the container or volume yet.
 
