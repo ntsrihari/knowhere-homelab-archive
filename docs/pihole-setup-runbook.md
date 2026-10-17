@@ -2,7 +2,7 @@
 
 **Target:** `knowhere` Ubuntu / Docker Compose  
 **Pi-hole generation:** v6 (official `pihole/pihole:latest` image)  
-**Status:** Pi-hole is running and passed host-side DNS/HTTP health checks on 2026-10-17 at candidate IP `192.168.29.68`. FTL is healthy, blocking is enabled, `example.com` resolved through Pi-hole, and the admin route returned HTTP 302. Router DHCP reservation and browser login remain pending. Do not advertise Pi-hole to the whole LAN until the address is reserved.
+**Status:** Pi-hole is running and passed host-side DNS/HTTP health checks on 2026-10-17 at `192.168.29.68`. The user will not change router configuration; clients must be configured individually. This address is currently DHCP-assigned and could change, so per-device settings may need updating if `knowhere` receives a different address.
 
 Pi-hole Docker v6 uses `FTLCONF_...` environment variables. This configuration follows the official Docker quick-start structure and v6 configuration method: [Pi-hole Docker docs](https://docs.pi-hole.net/docker/) and [Docker configuration docs](https://docs.pi-hole.net/docker/configuration/).
 
@@ -14,7 +14,7 @@ Pi-hole Docker v6 uses `FTLCONF_...` environment variables. This configuration f
 - Upstream resolvers: Cloudflare `1.1.1.1` and Quad9 `9.9.9.9`.
 - LAN DHCP remains on the home router. **Do not enable Pi-hole DHCP** as part of this setup.
 - Keep DNS ports bound to the LAN address only. Do not set router port-forwarding for DNS or the Pi-hole admin page.
-- Use a DHCP reservation on the router for the server IP; don't assume today's DHCP lease will remain stable.
+- The user will not change router configuration. Configure DNS manually on each target client. The server address is a DHCP lease; if it changes, device DNS settings must be updated. Never assume the current IP will remain stable.
 - The current service does not configure itself as a public/remote DNS service.
 
 ## Observed LAN state — 2026-10-17
@@ -134,38 +134,79 @@ sudo systemctl enable homelab-pihole.service
 
 Don't enable/restart the unit if the address isn't stable or the service tests fail.
 
-## 4. Make Pi-hole DNS the default for the home network
+## 4. Configure each device manually (no router changes)
 
-**Recommended: configure DNS in the router's DHCP/LAN settings.** Use `<KNOWHERE-LAN-IP>` as the LAN DNS server distributed to clients. Keep the router as DHCP server. Do not add a public secondary DNS (e.g. 8.8.8.8) if the goal is to have every device use Pi-hole; clients may bypass Pi-hole by using the public secondary. Leave WAN/Internet DNS and port-forwarding alone unless the router's UI explicitly distinguishes these from LAN DHCP DNS.
+The user will not change the router. Set DNS per device, starting with one test device. Use `192.168.29.68` as the current Pi-hole DNS address. Do **not** enter a public secondary resolver if the goal is for this device's queries to be filtered by Pi-hole; a public secondary can bypass filtering.
 
-Save the router change and renew one test client's Wi-Fi lease. Test browsing, streaming, and the Pi-hole query log. Only then renew the rest of the clients.
+### Windows 11 PC
 
-**Rollback:** restore the router's previous LAN DHCP DNS setting, then renew clients' leases. This returns devices to the old resolver without changing their per-device static settings.
+1. Settings → Network & internet → Wi-Fi (or Ethernet) → the connected network / adapter.
+2. Find **DNS server assignment** and select **Edit** → **Manual**.
+3. Turn IPv4 on. Set **Preferred DNS** to `192.168.29.68`.
+4. Leave Alternate DNS blank if the UI permits. Set DNS over HTTPS to **Off** for this manually configured LAN resolver unless you explicitly configure a matching DoH endpoint.
+5. Save. In PowerShell run `ipconfig /flushdns`, then `nslookup example.com 192.168.29.68`.
 
-Router settings vary by model. After Pi-hole passes tests, use the router's actual make/model UI to find LAN / DHCP Server / DNS Server (not WAN DNS, unless the router's interface explicitly says it advertises this resolver to LAN clients).
+To undo: return DNS server assignment to **Automatic (DHCP)**. Microsoft documents the adapter-specific manual DNS controls [here](https://support.microsoft.com/en-us/windows/experience/connectivity-networking/essential-network-settings-and-tasks-in-windows).
 
-## 5. Device behavior
+### iPhone / iPad
 
-The router DHCP setting is the preferred way to cover Smart TVs, consoles, PCs, phones and tablets on home Wi-Fi without configuring each separately. Some devices or apps can use encrypted or hard-coded DNS and bypass network DNS settings.
+1. Settings → Wi-Fi → tap the ⓘ next to the connected home network.
+2. Configure DNS → Manual.
+3. Remove existing DNS servers from the list, add `192.168.29.68`, then Save.
+4. Open a few websites and check Pi-hole's Query Log.
 
-- **Samsung/Android phones and tablets:** connect to the home Wi-Fi and leave **Private DNS** on `Automatic`; do not set a custom provider hostname such as `dns.google` or a third-party encrypted-DNS provider if you expect local Pi-hole filtering. If it still bypasses Pi-hole, test with Private DNS `Off` while on home Wi-Fi and compare the query log. Android settings path: Settings → Connections/Network & Internet → More connection settings or Private DNS, depending on the device. See [Google Android network settings](https://support.google.com/android/answer/9654714).
-- **iPhone/iPad:** join the home Wi-Fi, ensure DNS is set to automatic from DHCP (unless deliberately doing a per-device manual test). Per-network controls are under Settings → Wi-Fi → the information button beside the connected network. See [Apple's Wi-Fi settings guide](https://support.apple.com/guide/iphone/manage-wi-fi-settings-iphw5gjwl8k2/ios). VPN/DNS profiles and iCloud Private Relay may affect some traffic.
-- **Samsung/Android TV, Google TV, Chromecast, Fire TV, consoles:** use DHCP/automatic network settings after router DNS is changed. If a device has custom DNS fields, remove any manually entered public DNS values. Some hard-coded DNS devices may still bypass; consider router firewall rules only after confirming the exact router and avoiding rules that could break streaming.
-- **Windows PCs:** DHCP/automatic DNS. Clear cached results with `ipconfig /flushdns` after renewing DHCP if needed.
-- **Mobile data / away from home:** router DHCP DNS only applies while connected to the home network. For filtering on cellular or other Wi-Fi, configure a private VPN/Tailscale DNS path to an address the phone can reach; don't assume the LAN IP works remotely. This is a separate step once home DNS is stable.
+To undo: return Configure DNS to **Automatic**. Apple documents per-network Wi-Fi settings [here](https://support.apple.com/en-ie/guide/iphone/iphw5gjwl8k2/27/ios/27). This affects that Wi-Fi network, not cellular data.
 
-Don't change all devices manually and don't force DNS through firewall rules yet. Verify the router-provided resolver first.
+### Samsung Galaxy S25 Ultra (Android)
 
-## 6. Confirm client DNS
+Android's **Private DNS** field expects a provider hostname, not a plain LAN IP address; Pi-hole in this deployment is not configured as a DNS-over-TLS hostname. Do not enter `192.168.29.68` in the Private DNS hostname field.
 
-On Windows PowerShell (while connected to home Wi-Fi):
+Two per-device options:
+
+- **Preferred no-router option:** install the [Rethink DNS + Firewall](https://rethinkdns.com/download) app, then Configure → DNS → Other DNS → DNS 53, add `192.168.29.68` on port `53`, select it, and start the app. This uses Android's local VPN mechanism. Verify queries appear in Pi-hole's Query Log. Because the Pi-hole IP is private to the home LAN, DNS will not reach it while away from home; stop/pause this profile outside home or configure an appropriate fallback/automation before relying on it.
+- **Built-in Wi-Fi manual DNS:** Settings → Connections → Wi-Fi → gear beside the home network → View more / IP settings → Static. Keep the current IP address, gateway and prefix displayed for that Wi-Fi network and set DNS 1 to `192.168.29.68`. Do not guess an IP address. This changes the phone from DHCP to static addressing and could cause an IP conflict after the router's lease expires, so prefer the app method if you cannot verify a safe static IP.
+
+Leave Private DNS at **Automatic** when using the app-based method; don't set a public provider hostname such as `dns.google` or `one.one.one.one` if you expect Pi-hole to see the phone's lookups. Google's Android Private DNS modes are described [here](https://support.google.com/android/answer/9654714?hl=en); Samsung's network settings vary by software version.
+
+### Samsung Smart TV
+
+On many Samsung TV models: All Settings → Connection (or General) → Network → Network Status → IP Settings → DNS Setting → Enter Manually → DNS Server. Enter `192.168.29.68`, save, then test an app such as YouTube and review Pi-hole Query Log. Leave IP assignment automatic if DNS can be edited independently.
+
+To undo: change DNS Setting back to **Obtain automatically**. Menu names vary by model. Samsung's support guide shows this manual DNS path [here](https://www.samsung.com/us/support/troubleshoot/TSG10002209/).
+
+### PlayStation 5
+
+1. Settings → Network → Settings → Set Up Internet Connection.
+2. Highlight the connected network, open Advanced Settings, and set DNS Settings to Manual.
+3. Set Primary DNS to `192.168.29.68`. If Secondary DNS is mandatory, use the same Pi-hole address rather than a public resolver.
+4. Leave IP Address Settings on Automatic, then save and test the connection.
+
+To undo: set DNS Settings back to Automatic. Sony documents DNS as an Advanced Setting [here](https://www.playstation.com/en-us/support/connectivity/internet-connect-playstation/).
+
+### Other TVs, consoles, tablets and streaming devices
+
+In the device's current network details, look for **DNS**, **DNS server**, or **IP settings**. If DNS can be edited independently, enter `192.168.29.68` and leave IP assignment automatic. If the UI requires the whole IP profile to be set to Static, do not guess IP/gateway values; get the currently assigned values from that device first and be aware of address-collision risk. For models that don't expose DNS settings, per-device Pi-hole may not be possible without an app/VPN or a router-side change.
+
+### Mobile data and away from home
+
+Per-Wi-Fi DNS settings apply only to the configured home network. They don't route mobile data through Pi-hole. To filter remotely, the phone must have a secure path to Pi-hole (for example, a properly configured private VPN/Tailscale path); Pi-hole must not be exposed directly to the public internet.
+
+## 5. Test one device before rolling out to the rest
+
+1. Configure just one client.
+2. Browse normally.
+3. Open `http://192.168.29.68:8081/admin` → Query Log. Confirm the client makes queries.
+4. If internet DNS works but queries don't appear, the client may use encrypted DNS, VPN DNS, IPv6 DNS, or an app-specific resolver. Don't force firewall redirects yet.
+5. After the first device is stable, repeat the same per-device change on the others.
+
+For Windows, use:
 
 ```powershell
-ipconfig /all
-nslookup example.com <KNOWHERE-LAN-IP>
+ipconfig /flushdns
+nslookup example.com 192.168.29.68
 ```
 
-Check the DNS Servers line for the Wi-Fi adapter. On Android/iOS, check the connected Wi-Fi network details. Open the Pi-hole query log and confirm the client appears and that normal domain queries are received.
+For other devices, a query visible in Pi-hole's Query Log is the strongest quick confirmation that they are using this server.
 
 ## Security and recovery notes
 
