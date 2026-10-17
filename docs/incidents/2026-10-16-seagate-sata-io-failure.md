@@ -65,6 +65,14 @@ After the operator explicitly accepted the risk and requested the internal Seaga
 
 This repeat failure means the planned primary storage cannot currently be brought online. Preserve the source and mirror drives; pause Immich deployment until an acceptable primary storage is available.
 
+## Kernel evidence from repeat failure (2026-10-17, UTC)
+
+Read-only journal inspection after reconnecting over SSH showed the host did **not** reboot at the time of the second format failure: current boot began at 04:24:30 UTC and was still active after the 13:58 UTC failure. The SSH disconnect alone was not a host reboot.
+
+Kernel messages at 13:57:57 UTC reported a failed `READ FPDMA QUEUED` with `error: { UNC }` and SATA `SError: { CommWake }`. The kernel then logged a command timeout while trying to disable DIPM, repeated hard resets, `ata3.00: revalidation failed (errno=-2)`, and `ata3.00: disable device`. It recorded read I/O errors on `sdc` at sector 89,917,440, writes failing at early sectors of the new partition, and multiple `Buffer I/O error` / lost asynchronous page writes on `sdc1`.
+
+This evidence combines an uncorrectable read response (`UNC`) with a SATA communication/revalidation failure and failed metadata writes. The output does not identify a single root cause, but it confirms the disk is not currently a reliable write target. Do not try to mount the partial ext4 filesystem or repeat format/write tests. `/srv/storage` is not mounted. No write target is approved until this drive/device path is stable.
+
 ## Safeguards while on hold
 
 - Do not retry `mkfs`, `wipefs`, `badblocks`, filesystem repair, or other write tests against the Seagate.
