@@ -7,12 +7,12 @@ Infrastructure configuration and operating documentation for the always-on Ubunt
 - Portainer CE — `portainer/compose.yaml`
 - Jellyfin — `jellyfin/compose.yaml`
 - Navidrome — `navidrome/compose.yaml`
-- Immich v3.1.0 — `immich/compose.yaml` (prepared to use the preserved One Touch HDD data paths; activate only after the mount is switched to read-write and the current database dump is restored).
+- Immich v3.1.0 — `immich/compose.yaml` (started on Linux using the One Touch HDD at `/mnt/immich`; database restore count checks passed).
   - Guarded deployment script: `immich/bootstrap-linux.sh` (backs up fstab, switches the One Touch mount to read-write, restores the October 17 database dump to a fresh production DB directory, verifies counts, then starts Immich).
 
 Systemd startup units for Jellyfin and Navidrome are stored under `systemd/`.
 
-Immich's Linux Compose project is now prepared in `immich/compose.yaml`. The intended primary media location is the existing One Touch HDD at `/mnt/immich`; the Linux service must not start until its UUID is verified and the mount is read-write. The Windows Immich server remains stopped while the restored database is prepared. The internal Seagate has repeatedly failed SATA reads/writes and is not currently usable as the planned mirror/cloud-storage target. Pi-hole and Nextcloud Compose definitions are not present in the current repository snapshot.
+Immich's Linux Compose project in `immich/compose.yaml` is running from the existing One Touch HDD at `/mnt/immich`, with its UUID verified and mount set read-write for uploads. The October 17 database backup was restored into the Linux PostgreSQL directory and key counts passed. The Windows Immich server remains stopped while Linux Immich is active. The internal Seagate has repeatedly failed SATA reads/writes and is not currently usable as the planned mirror/cloud-storage target. Pi-hole and Nextcloud Compose definitions are not present in the current repository snapshot.
 
 ## Operating principles
 
