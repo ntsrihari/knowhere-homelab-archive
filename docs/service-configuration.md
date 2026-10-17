@@ -81,7 +81,7 @@ File: [pihole/compose.yaml](../pihole/compose.yaml); based on the official Pi-ho
 - Router remains the DHCP server; Pi-hole DHCP is not enabled.
 - Web password and IP are stored in local `pihole/.env`, never commit that file.
 - Startup unit: [systemd/homelab-pihole.service](../systemd/homelab-pihole.service), validates `PIHOLE_IP` is present on the host and the persistent directory exists before running Compose.
-- Deployment status: configuration committed, service not yet started pending LAN-IP and port-conflict checks.
+- Deployment status: container started on candidate `192.168.29.68`; initial blocklist initialization completed with 73,634 unique domains. DNS/query and web-admin tests are still pending; router DNS must not be changed until the IP is reserved and tests pass.
 
 See the [Pi-hole setup runbook](pihole-setup-runbook.md) for the exact deployment, DNS test, router rollout, device instructions and rollback.
 
