@@ -5,7 +5,7 @@
 # from /home/srihari/immich-current-20261017.dump on the OS SSD.
 set -euo pipefail
 
-REPO_ROOT="$(cd "$(dirname "\${BASH_SOURCE[0]}")/.." && pwd)"
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 IMMICH_DIR="$REPO_ROOT/immich"
 BACKUP="/home/srihari/immich-current-20261017.dump"
 MOUNT="/mnt/immich"
