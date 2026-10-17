@@ -7,7 +7,7 @@ Infrastructure configuration and operating documentation for the always-on Ubunt
 - Portainer CE — `portainer/compose.yaml`
 - Jellyfin — `jellyfin/compose.yaml`
 - Navidrome — `navidrome/compose.yaml`
-- Pi-hole — `pihole/compose.yaml` (prepared; requires reserved LAN IP before start).
+- Pi-hole — `pihole/compose.yaml` (running; DNS is being configured for LAN and Tailscale clients without router changes).
 - Immich v3.1.0 — `immich/compose.yaml` (started on Linux using the One Touch HDD at `/mnt/immich`; database restore count checks passed).
   - Guarded deployment script: `immich/bootstrap-linux.sh` (backs up fstab, switches the One Touch mount to read-write, restores the October 17 database dump to a fresh production DB directory, verifies counts, then starts Immich).
 
@@ -31,8 +31,8 @@ Immich's Linux Compose project in `immich/compose.yaml` is running from the exis
 - [Server inventory and target architecture](docs/server-inventory.md) — host, disks, services, data sources, and planned storage roles.
 - [Migration status and acceptance gates](docs/migration-status.md) — conditions required before starting the Immich migration.
 - [Immich Linux migration runbook](docs/immich-linux-migration-runbook.md) — commands, database backup/restore results, storage layout, guarded bootstrap procedure and current blockers.
-- [Pi-hole setup runbook](docs/pihole-setup-runbook.md) — Pi-hole deployment, per-device DNS settings, tests and rollback (current server IP: `192.168.29.68`; router configuration is intentionally left unchanged).
-- [Pi-hole setup runbook](docs/pihole-setup-runbook.md) — DNS deployment, DHCP/router rollout, mobile/TV device behavior, tests and rollback.
+- [Pi-hole setup runbook](docs/pihole-setup-runbook.md) — Pi-hole deployment, per-device DNS settings, tests and rollback (LAN IP `192.168.29.68`; router configuration is intentionally left unchanged; Tailscale binding is being enabled).
+
 
 ## Current hold
 
