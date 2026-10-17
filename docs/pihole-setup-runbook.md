@@ -185,15 +185,19 @@ To undo: return Configure DNS to **Automatic**. Apple documents per-network Wi-F
 
 ### Samsung Galaxy S25 Ultra (Android)
 
-Android's **Private DNS** field expects a provider hostname, not a plain LAN IP address; Pi-hole in this deployment is not configured as a DNS-over-TLS hostname. Do not enter `192.168.29.68` in the Private DNS hostname field.
+**Recommended for home and away:** use the Tailscale DNS path, so the phone can reach Pi-hole by its stable tailnet address without setting a static LAN IP.
 
-Two per-device options:
+1. Confirm the phone has the Tailscale app installed, signed in to the same tailnet as `knowhere`, and connected.
+2. From a browser, first test the Pi-hole admin page at `http://100.104.30.99:8081/admin`. It should redirect to the login page.
+3. Open the [Tailscale admin DNS page](https://login.tailscale.com/admin/dns). Under Global nameservers, add `100.104.30.99`, then enable **Override DNS servers**. Keep MagicDNS enabled.
+4. **Scope warning:** Global nameserver plus Override DNS servers applies to all tailnet devices that accept Tailscale DNS, not just this phone. They will send their DNS queries to Pi-hole while connected. If you don't want that tailnet-wide behavior, stop here and use only the local Wi-Fi method instead.
+5. On the S25 Ultra, open Tailscale and ensure its DNS setting / “Use Tailscale DNS settings” is enabled. Keep Tailscale connected at home and away when you want Pi-hole filtering.
+6. Samsung Settings → Connections → More connection settings → **Private DNS** → **Automatic**. Do not enter `192.168.29.68` or `100.104.30.99` in the Private DNS provider-hostname field; Android expects a hostname there, and this deployment isn't configured for DNS-over-TLS. Samsung's Private DNS choices are documented [here](https://www.samsung.com/us/support/answer/ANS10002546/).
+7. Open a few sites, then open Pi-hole Admin → Query Log and check that queries appear from the phone. If DNS fails, temporarily turn off **Override DNS servers** in Tailscale Admin DNS or disconnect Tailscale; this is the rollback.
 
-- **Preferred no-router option:** install the [Rethink DNS + Firewall](https://rethinkdns.com/download) app, then Configure → DNS → Other DNS → DNS 53, add `192.168.29.68` on port `53`, select it, and start the app. This uses Android's local VPN mechanism. Verify queries appear in Pi-hole's Query Log. Because the Pi-hole IP is private to the home LAN, DNS will not reach it while away from home; stop/pause this profile outside home or configure an appropriate fallback/automation before relying on it.
-- **Built-in Wi-Fi manual DNS:** Settings → Connections → Wi-Fi → gear beside the home network → View more / IP settings → Static. Keep the current IP address, gateway and prefix displayed for that Wi-Fi network and set DNS 1 to `192.168.29.68`. Do not guess an IP address. This changes the phone from DHCP to static addressing and could cause an IP conflict after the router's lease expires, so prefer the app method if you cannot verify a safe static IP.
+**Local-only alternative:** in Wi-Fi settings, you may set per-network DNS manually, but some Android versions require switching IP settings to Static. That risks IP conflicts if the router later leases the same address to another device. Do not change to Static unless you know a safe unused address; no router settings are being changed.
 
-Leave Private DNS at **Automatic** when using the app-based method; don't set a public provider hostname such as `dns.google` or `one.one.one.one` if you expect Pi-hole to see the phone's lookups. Google's Android Private DNS modes are described [here](https://support.google.com/android/answer/9654714?hl=en); Samsung's network settings vary by software version.
-
+Android has only one active VPN slot on a normal profile. Do not start RethinkDNS or another VPN app at the same time as Tailscale; doing so can disconnect one of them. Tailscale explains this limitation [here](https://tailscale.com/docs/reference/faq/other-vpns).
 ### Samsung Smart TV
 
 On many Samsung TV models: All Settings → Connection (or General) → Network → Network Status → IP Settings → DNS Setting → Enter Manually → DNS Server. Enter `192.168.29.68`, save, then test an app such as YouTube and review Pi-hole Query Log. Leave IP assignment automatic if DNS can be edited independently.
@@ -209,14 +213,19 @@ To undo: change DNS Setting back to **Obtain automatically**. Menu names vary by
 
 To undo: set DNS Settings back to Automatic. Sony documents DNS as an Advanced Setting [here](https://www.playstation.com/en-us/support/connectivity/internet-connect-playstation/).
 
-### Other TVs, consoles, tablets and streaming devices
+### Amazon Fire TV / Fire TV Stick
 
-In the device's current network details, look for **DNS**, **DNS server**, or **IP settings**. If DNS can be edited independently, enter `192.168.29.68` and leave IP assignment automatic. If the UI requires the whole IP profile to be set to Static, do not guess IP/gateway values; get the currently assigned values from that device first and be aware of address-collision risk. For models that don't expose DNS settings, per-device Pi-hole may not be possible without an app/VPN or a router-side change.
+For LAN-only use, Fire TV generally requires a manual network setup (Static IP) to change DNS; the menu may vary by Fire OS version. First go to Settings → My Fire TV → About → Network and **write down the Fire TV's exact current IP address, gateway and network prefix length**. Do not forget the Wi-Fi network until you've recorded these.
 
-### Mobile data and away from home
+Then:
+1. Settings → Network → highlight the connected Wi-Fi network → menu button → Forget.
+2. Reconnect to the same Wi-Fi, enter its password, and choose **Advanced** if offered.
+3. Enter the recorded IP address and gateway unchanged. For this network, the server is on `192.168.29.0/24` and the gateway observed on `knowhere` is `192.168.29.1`; keep the Fire TV's recorded values rather than guessing.
+4. Set Network Prefix Length to the recorded value (usually `24` for this LAN).
+5. DNS 1: `192.168.29.68`. For DNS 2, use the same `192.168.29.68` if the screen requires a value; don't put a public resolver there, as it could bypass Pi-hole.
+6. Connect and test streaming. Check Pi-hole Admin → Query Log for the Fire TV's requests.
 
-Per-Wi-Fi DNS settings apply only to the configured home network. They don't route mobile data through Pi-hole. To filter remotely, the phone must have a secure path to Pi-hole (for example, a properly configured private VPN/Tailscale path); Pi-hole must not be exposed directly to the public internet.
-
+**Static-IP caution:** without a router DHCP reservation, a manually configured IP can eventually conflict with another device. Because you won't change router settings, don't proceed with manual Static IP if you don't know the current values or aren't comfortable accepting that risk. Alternative: install the official Tailscale client on a supported Fire TV model and use the tailnet DNS setup above. Tailscale currently supports many Fire TV devices, but not Fire OS 5/6 or Vega OS, and notes some model exclusions; check its [official Fire TV install guide](https://tailscale.com/docs/install/amazon-fire) before sideloading.
 ## 5. Test one device before rolling out to the rest
 
 1. Configure just one client.
