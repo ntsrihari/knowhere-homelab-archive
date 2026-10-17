@@ -8,6 +8,7 @@ Infrastructure configuration and operating documentation for the always-on Ubunt
 - Jellyfin — `jellyfin/compose.yaml`
 - Navidrome — `navidrome/compose.yaml`
 - Immich v3.1.0 — `immich/compose.yaml` (prepared to use the preserved One Touch HDD data paths; activate only after the mount is switched to read-write and the current database dump is restored).
+  - Guarded deployment script: `immich/bootstrap-linux.sh` (backs up fstab, switches the One Touch mount to read-write, restores the October 17 database dump to a fresh production DB directory, verifies counts, then starts Immich).
 
 Systemd startup units for Jellyfin and Navidrome are stored under `systemd/`.
 
