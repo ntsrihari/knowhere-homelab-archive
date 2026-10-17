@@ -80,7 +80,7 @@ echo "=== Host resolver ==="
 resolvectl status 2>/dev/null | sed -n '1,100p' || cat /etc/resolv.conf
 ```
 
-Use the LAN IPv4 address on the interface with the default route, not the Tailscale `100.x` address, `127.0.0.1`, or a Docker bridge address. Before making it the Pi-hole IP, create a DHCP reservation for it on your router or set a static LAN address outside the DHCP pool.
+Use the LAN IPv4 address on the interface with the default route, not the Tailscale `100.x` address, `127.0.0.1`, or a Docker bridge address. Router configuration is intentionally not part of this rollout. The LAN IP is a DHCP lease; per-device DNS works as long as it remains `192.168.29.68`. If the server receives a different LAN IP, update `PIHOLE_IP` in `.env`, recreate the Compose service, and update each device's manual DNS setting. Do not guess a static address outside the DHCP pool.
 
 Inspect the existing `ss` output. A resolver listening only on `127.0.0.53:53` does not necessarily conflict with Pi-hole bound to the LAN IP; a listener on the LAN IP or wildcard `0.0.0.0:53` can conflict. Don't stop systemd-resolved blindly.
 
@@ -119,7 +119,7 @@ ip -o -4 address show | awk '{print $4}' | cut -d/ -f1 | grep -Fx "$PIHOLE_IP"
 docker compose config -q
 ```
 
-If either IP check prints no result, stop and correct the local `.env` values. The user is not changing router configuration; the LAN address remains a DHCP lease and may need to be changed on devices if it changes. Verify with `ss` that no conflicting service already owns the selected IP's port 53 or port 8081.
+If either IP check prints no result, stop and correct the local `.env` values. The LAN address remains a DHCP lease and may need to be changed in each device if it changes. Verify with `ss` that no conflicting service already owns the selected IP's port 53 or port 8081.
 
 Then start:
 
@@ -152,7 +152,7 @@ Don't enable/restart the unit if the address isn't stable or the service tests f
 
 ## 4. Configure each device manually (no router changes)
 
-The user will not change the router. Set DNS per device, starting with one test device. Use `192.168.29.68` as the current Pi-hole DNS address. Do **not** enter a public secondary resolver if the goal is for this device's queries to be filtered by Pi-hole; a public secondary can bypass filtering.
+The user will not change the router. Set DNS per local-only device, starting with one test device. Use `192.168.29.68` as the current Pi-hole DNS address. For devices with Tailscale that need filtering away from home, use the Tailscale nameserver path below. Do **not** enter a public secondary resolver if the goal is for this device's queries to be filtered by Pi-hole; a public secondary can bypass filtering.
 
 ### Windows 11 PC
 
