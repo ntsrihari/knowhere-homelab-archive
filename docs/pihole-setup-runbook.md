@@ -17,6 +17,16 @@ Pi-hole Docker v6 uses `FTLCONF_...` environment variables. This configuration f
 - Use a DHCP reservation on the router for the server IP; don't assume today's DHCP lease will remain stable.
 - The current service does not configure itself as a public/remote DNS service.
 
+## Observed LAN state — 2026-10-17
+
+On the server when this runbook was updated:
+- LAN interface: `enp0s31f6`
+- Current DHCP IPv4: `192.168.29.68/24` (dynamic, so it must be reserved before using network-wide)
+- Default gateway/router: `192.168.29.1`
+- Ethernet MAC: `50:9a:4c:49:44:9d`
+- `systemd-resolved` DNS listeners are only on loopback (`127.0.0.53:53` and `127.0.0.54:53`); the captured listener check showed no process on host ports 80, 443, or 8081.
+- Candidate Pi-hole IPv4 for DHCP reservation: `192.168.29.68`. Verify reservation in the router before advertising it to LAN clients.
+
 ## 1. Detect LAN IP, gateway, and port conflicts (read-only)
 
 On `knowhere`:
