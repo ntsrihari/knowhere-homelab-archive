@@ -14,6 +14,26 @@
 - Kingston external 512 GB SSD with serial `50026B7684B4198D` was last observed at `/mnt/media`.
 - Internal Seagate 1 TB HDD serial `WL114BWW` had a failed ext4 format attempt, SATA link failures, and subsequent SMART findings of 31,440 reallocated sectors, 104 pending sectors and 104 offline-uncorrectable sectors. It is not an approved primary-storage destination; replace it or use another verified healthy disk.
 
+## Database backup restore test — 2026-10-17
+
+**Result: SQL restore completed successfully in an isolated test environment.** This validates that the compressed dump can be loaded into the compatible PostgreSQL image, but not yet that the restored contents match the source database or that media files are all present.
+
+- Backup: `/mnt/immich/ImmichData/backups/immich-db-backup-20261015T020000-v3.1.0-pg14.19.sql.gz`
+- `gzip -t`: PASS
+- Image: `ghcr.io/immich-app/postgres:14-vectorchord0.4.3-pgvectors0.2.0@sha256:bcf63357191b76a916ae5eb93464d65c07511da41e3bf7a8416db519b40b1c23`
+- PostgreSQL version: 14.19
+- Isolated container: `immich-restore-test-pg`
+- Temporary named volume: `immich-restore-test-data`
+- Container was created with `--network none` and no published ports. The volume uses Docker's default storage on the OS SSD, not the Seagate.
+- Database size reported by PostgreSQL: 553 MB
+- Extension versions observed: `cube 1.5`, `earthdistance 1.1`, `pg_trgm 1.6`, `unaccent 1.1`, `uuid-ossp 1.1`, `vchord 0.4.3`, `vector 0.8.1`
+- Public table count: 66
+- Restored row counts: `asset=28114`, `album=38`, `album_asset=7212`, `asset_metadata=0`, `library=1`, `activity=0`, `partner=0`, `kysely_migrations=88`
+- The zero-row tables are observations to compare against the source database; they are not currently declared failures.
+- Test resources are intentionally retained pending review: do not remove the container or volume yet.
+
+**Next database gate:** run the same safe count queries against the source database or another trusted source-side report, and compare schema/migration versions. Do not start the Linux Immich application against this temporary database and do not use it as the production database.
+
 ## Blocked work
 
 - Diagnose the SATA command/link failure and determine whether the cause is drive, connection/power, controller/port or software interaction.
