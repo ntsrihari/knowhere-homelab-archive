@@ -7,10 +7,11 @@ Infrastructure configuration and operating documentation for the always-on Ubunt
 - Portainer CE — `portainer/compose.yaml`
 - Jellyfin — `jellyfin/compose.yaml`
 - Navidrome — `navidrome/compose.yaml`
+- Immich v3.1.0 — `immich/compose.yaml` (prepared to use the preserved One Touch HDD data paths; activate only after the mount is switched to read-write and the current database dump is restored).
 
 Systemd startup units for Jellyfin and Navidrome are stored under `systemd/`.
 
-Immich is currently the Windows Docker Desktop/WSL2 source deployment and is not yet configured as a Compose project in this repository. Pi-hole and Nextcloud are planned services; their Compose definitions are not present in the current repository snapshot.
+Immich's Linux Compose project is now prepared in `immich/compose.yaml`. The intended primary media location is the existing One Touch HDD at `/mnt/immich`; the Linux service must not start until its UUID is verified and the mount is read-write. The Windows Immich server remains stopped while the restored database is prepared. The internal Seagate has repeatedly failed SATA reads/writes and is not currently usable as the planned mirror/cloud-storage target. Pi-hole and Nextcloud Compose definitions are not present in the current repository snapshot.
 
 ## Operating principles
 
@@ -30,4 +31,4 @@ Immich is currently the Windows Docker Desktop/WSL2 source deployment and is not
 
 ## Current hold
 
-An ext4 format attempt on the internal Seagate 1 TB HDD failed during filesystem metadata writes, followed by SATA read/write timeouts and failed link resets. The root cause is unresolved; this does not prove that the HDD itself is defective. Formatting and Immich migration are on hold. Both external data drives must be preserved unchanged until the incident is resumed and migration acceptance is complete.
+The internal Seagate 1 TB HDD has failed two ext4 format attempts with SATA read/write I/O errors and an uncorrectable read response. Do not retry writes or use it for a mirror/cloud-data target until storage reliability is addressed. Immich Linux configuration is prepared to reuse the One Touch HDD's existing data tree, preserving the internal container paths; it is not yet activated.
