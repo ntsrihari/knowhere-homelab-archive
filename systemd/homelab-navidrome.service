@@ -8,7 +8,7 @@ RequiresMountsFor=/mnt/media
 Type=oneshot
 RemainAfterExit=yes
 WorkingDirectory=/opt/homelab/navidrome
-ExecStartPre=/bin/sh -ec 'test "$(/usr/bin/findmnt --noheadings --output UUID --mountpoint /mnt/media)" = "D09481079480F0F0"; test -d /mnt/media/Media/Music'
+ExecStartPre=/bin/sh -ec 'test "$(/usr/bin/readlink -f /dev/disk/by-uuid/D09481079480F0F0)" = "$(/usr/bin/findmnt --noheadings --output SOURCE --mountpoint /mnt/media)"; test -d /mnt/media/Media/Music'
 ExecStart=/usr/bin/docker compose up -d
 ExecStop=/usr/bin/docker compose stop
 TimeoutStartSec=0
