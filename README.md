@@ -31,6 +31,7 @@ Immich's Linux Compose project in `immich/compose.yaml` is running from the exis
 - [Server inventory and target architecture](docs/server-inventory.md) — host, disks, services, data sources, and planned storage roles.
 - [Migration status and acceptance gates](docs/migration-status.md) — conditions required before starting the Immich migration.
 - [Immich Linux migration runbook](docs/immich-linux-migration-runbook.md) — commands, database backup/restore results, storage layout, guarded bootstrap procedure and current blockers.
+- [Pi-hole setup runbook](docs/pihole-setup-runbook.md) — Pi-hole deployment, router DHCP DNS rollout, device guidance, tests and rollback (observed LAN candidate: `192.168.29.68`; reserve before network-wide use).
 - [Pi-hole setup runbook](docs/pihole-setup-runbook.md) — DNS deployment, DHCP/router rollout, mobile/TV device behavior, tests and rollback.
 
 ## Current hold
