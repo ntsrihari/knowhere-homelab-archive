@@ -52,6 +52,22 @@ Startup unit: [systemd/homelab-navidrome.service](../systemd/homelab-navidrome.s
 
 Last reported endpoint: `http://knowhere:4533`.
 
+## Immich
+
+File: [immich/compose.yaml](../immich/compose.yaml); based on the official v3.1.0 Compose file.
+
+- Immich server and machine-learning image tag: `v3.1.0`
+- PostgreSQL image: `ghcr.io/immich-app/postgres:14-vectorchord0.4.3-pgvectors0.2.0` pinned by digest
+- Redis-compatible cache: Valkey 9 pinned by digest
+- Web/mobile endpoint: `http://knowhere:2283`
+- Existing managed-data path: host `/mnt/immich/ImmichData` to container `/data`
+- Existing external-library path: host `/mnt/immich/Photos` to container `/mnt/photos`, read-only
+- PostgreSQL files: `/srv/appdata/immich/postgres` on the OS SSD
+- Secrets/settings: local `immich/.env`, created from `immich/.env.example`; never commit `.env` or the database dump
+- Startup guard requires One Touch UUID `AD95-6C91`, a read-write mount at `/mnt/immich`, and the expected data directories. Bind mounts use `create_host_path: false` to avoid accidentally creating empty directories on the OS disk if the external drive is absent.
+- The Windows Immich server should remain stopped while Linux is active. Keep the original Windows PostgreSQL database preserved.
+- The internal Seagate intended for mirroring/cloud data has repeat I/O failures and is not currently a usable target. Do not configure a mirror or Nextcloud data directory on it until reliability is addressed.
+
 ## Image pinning and persistent state
 
 The inspected manifests use moving tags `latest` or `lts`, not pinned image digests. Image updates can therefore change the deployed versions. Pinning is a separate maintenance change; do not modify running services as part of the current storage incident hold.
@@ -62,4 +78,4 @@ The repository's `.gitignore` excludes `.env`, secret directories, key files, ba
 
 ## Required follow-up after storage hold
 
-The Jellyfin and Navidrome Compose files no longer bind `/mnt/internal-hdd`; both use only the Kingston mount at `/mnt/media`, read-only. Their systemd units check the filesystem UUID and required media paths before starting. The Seagate incident remains on hold, and the Seagate is not used by either service.
+The Jellyfin and Navidrome Compose files use the Kingston mount at `/mnt/media`, read-only. Their systemd units check the filesystem UUID and required media paths before starting. Immich has a prepared Compose project with storage/mount guards as described above. The Seagate remains excluded from all active service mappings.
