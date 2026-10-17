@@ -32,6 +32,27 @@ This proves a communication failure at the SATA command/link layer. It does not 
 | `/dev/sdc` | Seagate ST1000LM048-2E7172 | `WL114BWW` | Partition exists, no recognized filesystem | Affected drive; on hold |
 | `/dev/sdd` | Kingston SNVS500G 512 GB | `50026B7684B4198D` | NTFS UUID `D09481079480F0F0`, `/mnt/media` | External data source; preserve |
 
+## SMART data captured after reconnection (2026-10-17)
+
+The drive responded to `sudo smartctl -x /dev/sdc` after it was physically unplugged and reconnected. Identity matched the affected disk: model `ST1000LM048-2E7172`, serial `WL114BWW`, firmware `SDM1`.
+
+Relevant output:
+- SMART overall-health self-assessment: `PASSED`
+- Reallocated sector count (attribute 5): `31,440`
+- Current pending sectors (attribute 197): `104`
+- Offline uncorrectable sectors (attribute 198): `104`
+- Reported uncorrectable (attribute 187): raw value `38`
+- Command timeout (attribute 188): raw value is vendor-specific; do not interpret it as a simple count without Seagate-specific decoding.
+- Power-on hours (attribute 9): `17,793`
+- Temperature: `31 C`
+- UDMA CRC error count (attribute 199): `0`
+- Device statistics also report 31,440 reallocated logical sectors, 104 reallocation-candidate logical sectors, 25,018 reported uncorrectable errors in that vendor log, and 152 resets between command acceptance and completion.
+- No SMART self-tests had been logged.
+
+Interpretation: the overall SMART pass does not negate the very large reallocated-sector count and nonzero pending/offline-uncorrectable counts. These are serious media-health warnings. Zero UDMA CRC errors does not rule out all SATA cable, power, controller, or link issues. The fact that reseating restored communication does not restore confidence in the media.
+
+**Operational decision:** do not use this Seagate as primary storage for irreplaceable photos or backups. Do not stress-test or repeatedly format it. Plan to use a different, verified-healthy storage device for the primary Immich destination. The root cause of the earlier SATA link failure remains unresolved, and the Seagate may still have an additional connection/controller/software problem.
+
 ## Safeguards while on hold
 
 - Do not retry `mkfs`, `wipefs`, `badblocks`, filesystem repair, or other write tests against the Seagate.
