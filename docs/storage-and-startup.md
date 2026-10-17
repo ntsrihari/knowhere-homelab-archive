@@ -6,7 +6,7 @@ The external drives were configured as read-only mounts in /etc/fstab.
 
 | UUID | Mount point | Filesystem | Access | Role |
 |---|---|---|---|---|
-| AD95-6C91 | /mnt/immich | exFAT | Read-only | One Touch external 1 TB HDD; current Immich source |
+| AD95-6C91 | /mnt/immich | exFAT | Currently read-only; planned read-write for Immich | One Touch external 1 TB HDD; existing ImmichData and Photos trees |
 | D09481079480F0F0 | /mnt/media | NTFS via ntfs-3g | Read-only | Kingston external 512 GB SSD; older Immich dataset, media and NextcloudData |
 
 ## Internal Seagate — current status
@@ -44,6 +44,10 @@ sudo systemctl enable homelab-jellyfin.service homelab-navidrome.service
 
 Inspect services and mounts with systemctl status and findmnt. Validate /etc/fstab using sudo findmnt --verify --verbose before rebooting after mount changes.
 
-Jellyfin and Navidrome were updated on 2026-10-17 to use only the read-only Kingston mount at /mnt/media; stale /mnt/internal-hdd bind mounts were removed. Their systemd units now verify the mounted filesystem UUID (D09481079480F0F0) and required media directories before starting. The Seagate remains unmounted and must not be used. Before restarting services, verify that /mnt/media/Media/Movies, /mnt/media/Media/Shows, and /mnt/media/Media/Music exist.
+Jellyfin and Navidrome use only the read-only Kingston mount at /mnt/media; stale /mnt/internal-hdd bind mounts were removed. Their systemd units verify the Kingston UUID (D09481079480F0F0) and required media directories before starting.
+
+Immich Linux configuration is prepared under /opt/homelab/immich. It preserves the Windows container paths: /mnt/immich/ImmichData maps to /data, and /mnt/immich/Photos maps read-only to /mnt/photos. The One Touch mount must be changed to read-write for Immich uploads; the Immich systemd unit refuses to start unless UUID AD95-6C91 is mounted at /mnt/immich with rw options and all expected directories present. PostgreSQL data is planned for /srv/appdata/immich/postgres on the OS SSD. Do not start Immich until the current database dump is restored into that production database.
+
+The Seagate serial WL114BWW has now failed a second filesystem creation attempt with kernel I/O errors including an UNC read error, failed revalidation, and failed writes. It is not mounted at /srv/storage. Do not retry formatting or use it as an active mirror/cloud-storage target until the failure is resolved.
 
 See [the incident record](incidents/2026-10-16-seagate-sata-io-failure.md), [the server inventory](server-inventory.md), and [migration status](migration-status.md). Storage and Immich migration remain on hold until explicitly resumed.
