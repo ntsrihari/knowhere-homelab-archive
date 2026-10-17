@@ -2,7 +2,7 @@
 
 **Target:** `knowhere` Ubuntu / Docker Compose  
 **Pi-hole generation:** v6 (official `pihole/pihole:latest` image)  
-**Status:** Pi-hole container started on 2026-10-17 at candidate IP `192.168.29.68`. First initialization downloaded the default StevenBlack hosts list (73,634 domains); DNS and UI tests and router DHCP reservation are still pending. Do not point router/device DNS at Pi-hole until its IP is reserved and service tests pass.
+**Status:** Pi-hole is running and passed host-side DNS/HTTP health checks on 2026-10-17 at candidate IP `192.168.29.68`. FTL is healthy, blocking is enabled, `example.com` resolved through Pi-hole, and the admin route returned HTTP 302. Router DHCP reservation and browser login remain pending. Do not advertise Pi-hole to the whole LAN until the address is reserved.
 
 Pi-hole Docker v6 uses `FTLCONF_...` environment variables. This configuration follows the official Docker quick-start structure and v6 configuration method: [Pi-hole Docker docs](https://docs.pi-hole.net/docker/) and [Docker configuration docs](https://docs.pi-hole.net/docker/configuration/).
 
@@ -26,6 +26,15 @@ On the server when this runbook was updated:
 - Ethernet MAC: `50:9a:4c:49:44:9d`
 - `systemd-resolved` DNS listeners are only on loopback (`127.0.0.53:53` and `127.0.0.54:53`); the captured listener check showed no process on host ports 80, 443, or 8081.
 - Candidate Pi-hole IPv4 for DHCP reservation: `192.168.29.68`. Verify reservation in the router before advertising it to LAN clients.
+
+## DNS validation record — 2026-10-17
+
+Read-only tests after initialization succeeded:
+- Docker state: `running / healthy`.
+- `pihole status`: FTL listening on TCP and UDP port 53; blocking enabled.
+- `dig @192.168.29.68 example.com +time=3 +tries=1`: `NOERROR`, two A records returned, 109 ms.
+- `curl` to `http://192.168.29.68:8081/admin/`: HTTP `302`, a redirect response consistent with the admin route.
+- Not yet confirmed: interactive admin login, DNS query from another LAN client, DHCP reservation, or router-wide DNS cutover.
 
 ## First start record — 2026-10-17
 
