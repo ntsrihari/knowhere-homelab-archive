@@ -3,7 +3,7 @@
 **Last updated:** 2026-10-17  
 **Target:** `knowhere` (Ubuntu, Docker Compose)  
 **Immich version:** `v3.1.0`  
-**Status:** Linux deployment is prepared; bootstrap has **not yet been run**.
+**Status:** Bootstrap completed on 2026-10-17. Production PostgreSQL restore passed key-count checks and all four Immich containers started; UI/login and media browsing still need a brief confirmation.
 
 This runbook records the commands used during this migration and the intended next steps. Read the status and safety notes before repeating any step. The checked-in script `immich/bootstrap-linux.sh` is the main guarded bootstrap procedure.
 
@@ -32,7 +32,7 @@ Drive identities must be checked by UUID/model/serial, not a remembered `/dev/sd
 - The earlier SQL dump restore test also remains intact as `immich-restore-test-pg` / `immich-restore-test-data`.
 - The Linux production Compose project is in `immich/compose.yaml`; the environment template is `immich/.env.example`; startup is guarded by `systemd/homelab-immich.service`.
 - `immich/bootstrap-linux.sh` is designed to switch the One Touch mount to read-write, restore the fresh dump into a **new** database directory on the OS SSD, verify key row counts, then start the Linux application. The script has **not** been run as of this note.
-- The One Touch source was measured earlier at roughly 829 GB used and about 104 GB free. Treat remaining capacity as limited and check it before relying on uploads or derived data growth.
+- The One Touch source was measured at approximately 829 GB used and 104 GB free during bootstrap (89% used). Remaining capacity is limited; monitor it before relying on further uploads or regenerating derived data.
 - The Seagate cannot currently be used as a mirror or as cloud storage for devices. A mirroring job or Nextcloud data location must not be pointed at it while its I/O failures remain unresolved.
 
 ## 1. Read-only inventory on `knowhere`
@@ -197,6 +197,23 @@ Review the script in GitHub before running. It performs these stages:
 7. Installs the systemd unit, starts the Immich stack, and prints container status/logs.
 
 The script does **not** format the One Touch disk, copy or mirror the media tree, or touch the Seagate. If any preflight, remount, restore, or count check fails, stop and review its output instead of rerunning it blindly. Keep the generated `immich/.env`, the SQL/custom-format backup, and the restore-test volumes intact.
+
+## Bootstrap execution record — 2026-10-17
+
+The operator ran `bash immich/bootstrap-linux.sh` on `knowhere` after updating `/opt/homelab` from GitHub.
+
+Observed results:
+- Preflight passed and the script changed only the `UUID=AD95-6C91` entry in `/etc/fstab` to read-write, preserving a backup at `/etc/fstab.pre-immich-20261017-141645-15175`.
+- Read-write mount check passed for the One Touch HDD: `/dev/sda1`, UUID `AD95-6C91`, mounted at `/mnt/immich`.
+- Storage reported 932 GB total, 829 GB used and 104 GB available (89% used).
+- The production PostgreSQL container `immich_postgres` was created with persistent data at `/srv/appdata/immich/postgres`; the October 17 custom-format dump was restored.
+- Key counts passed: `asset=28149`, `album=38`, `album_asset=7212`, `asset_file=57572`, `integrity_report=72282`, `kysely_migrations=88`; foreign-key check `64|0` (64 total, zero unvalidated).
+- The systemd unit `homelab-immich.service` was installed and enabled. Compose started `immich_server`, `immich_machine_learning`, `immich_redis` and `immich_postgres`.
+- At the initial 12-second snapshot, PostgreSQL reported healthy while server, ML and Valkey reported `health: starting`. Server logs said Nest application started, API listening on port 2283, and microservices running. This is not yet confirmation of successful login or that every asset is browsable.
+- Windows `immich_server` must remain stopped while Linux is running. Preserve Windows `immich_postgres` and its volume until acceptance is complete.
+- The internal Seagate is **not** mounted or used; its repeated I/O failures continue to block mirror/cloud-storage plans.
+
+The script changes the One Touch mount from read-only to read-write. This is now the active Immich media store; keep the separate Windows database and both restore-test containers/volumes. Do not rerun the bootstrap blindly: it intentionally aborts if the production containers or DB directory already exist.
 
 ## 7. Validate after startup
 
