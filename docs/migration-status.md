@@ -1,7 +1,7 @@
 # Migration Status and Acceptance Gates
 
 **As of:** 2026-10-17  
-**Status:** ON HOLD — Seagate SATA I/O incident unresolved.
+**Status:** Immich deployment prepared; activation must use the One Touch HDD. Seagate mirror/cloud storage remains blocked by repeated SATA I/O failures.
 
 ## Existing system
 
@@ -49,15 +49,15 @@
 - Diagnose the SATA command/link failure and determine whether the cause is drive, connection/power, controller/port or software interaction.
 - Do not use the Seagate for irreplaceable data. Decide replacement/alternate primary storage; preserve the incident findings in the incident record.
 - Do not retry format or stress tests on the Seagate as part of the Immich migration.
-- Finalize target storage location, expected to be `/srv/storage`, and update media bind mounts and systemd startup safeguards.
+- One Touch HDD is the intended Immich primary location for now: `/mnt/immich/ImmichData` to container `/data`, with `/mnt/immich/Photos` mapped read-only to `/mnt/photos`. The Linux service must fail closed unless UUID `AD95-6C91` is mounted read-write.
 - Migrate the PostgreSQL database, managed Immich data and external library to Linux.
 - Verify library references, photo/asset counts, metadata, albums, uploads and database integrity.
 - Configure the portable file-level mirror with safety checks and retention policy.
 
 ## Acceptance gates
 
-1. **Primary-storage replacement selected:** do not approve the current Seagate based on its SMART pass flag; the sector counts are unacceptable for irreplaceable data. Choose a replacement or alternate drive and verify its health.
-2. **Filesystem verified:** create ext4 on the serial-confirmed replacement only after its health checks pass, record the UUID, and confirm controlled reads/writes without kernel I/O errors.
+1. **Current Immich primary:** use the existing One Touch source drive at `/mnt/immich` only after enabling read-write mount; keep its current `ImmichData` and `Photos` trees in place. The separate internal Seagate is not approved as mirror/cloud storage while I/O errors persist.
+2. **Seagate mirror/cloud target:** no usable filesystem is confirmed on serial `WL114BWW`; a second ext4 format attempt failed. Do not retry writes until the drive/SATA communication failure is resolved.
 3. **Mount guarded:** storage mount uses UUID, and services fail closed if required storage is missing rather than writing into an empty directory on the OS disk.
 4. **Capacity checked:** real source sizes, filesystem overhead, generated data and growth fit the primary destination. Capacity for the selected mirror dataset is separately measured.
 5. **Database restore proven:** the existing compressed dump is restored in a test context. A passing `gzip -t` alone is not enough.
@@ -70,6 +70,6 @@
 
 - Do not retry `mkfs`, `wipefs`, `badblocks`, filesystem repair or write tests on the Seagate. Its SMART data is now a replacement-level warning.
 - Do not format or alter the One Touch HDD or Kingston SSD.
-- Do not begin migration or configure automated synchronization.
+- Do not configure an automatic mirror to the Seagate until it can reliably write and read data.
 - Avoid rebooting or changing boot/kernel settings remotely without an explicit maintenance window and recovery access.
 - Keep the Windows Immich instance running/available as the source of truth, where operationally possible.
