@@ -53,6 +53,18 @@ Interpretation: the overall SMART pass does not negate the very large reallocate
 
 **Operational decision:** do not use this Seagate as primary storage for irreplaceable photos or backups. Do not stress-test or repeatedly format it. Plan to use a different, verified-healthy storage device for the primary Immich destination. The root cause of the earlier SATA link failure remains unresolved, and the Seagate may still have an additional connection/controller/software problem.
 
+## Repeat format failure (2026-10-17)
+
+After the operator explicitly accepted the risk and requested the internal Seagate be reused as the Immich primary-storage target, a second guarded format attempt was run using the serial-matched stable device path `/dev/disk/by-id/ata-ST1000LM048-2E7172_WL114BWW`.
+
+- Partition table creation and partition creation completed.
+- `mke2fs` created filesystem structures and printed UUID `8f43756c-4fcf-4b0e-ba43-f77beb4c905f`, then failed at filesystem accounting/superblock completion with: `mke2fs: Input/output error while writing out and closing file system`.
+- The SSH connection to `knowhere` closed immediately afterward. This alone does not prove the host rebooted or crashed.
+- A completed ext4 filesystem and a mount at `/srv/storage` are **not** confirmed. Do not mount this partial filesystem or repeat formatting/write tests.
+- The attempt targeted only the serial-confirmed Seagate. It did not target the One Touch or Kingston external drive.
+
+This repeat failure means the planned primary storage cannot currently be brought online. Preserve the source and mirror drives; pause Immich deployment until an acceptable primary storage is available.
+
 ## Safeguards while on hold
 
 - Do not retry `mkfs`, `wipefs`, `badblocks`, filesystem repair, or other write tests against the Seagate.
