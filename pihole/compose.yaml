@@ -21,7 +21,5 @@ services:
         target: /etc/pihole
         bind:
           create_host_path: false
-    cap_add:
-      - SYS_TIME
     security_opt:
       - no-new-privileges:true
