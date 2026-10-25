@@ -1,0 +1,43 @@
+#!/usr/bin/env bash
+# Fetches third-party service logos into ./icons (git-ignored, not committed).
+# Source: homarr-labs/dashboard-icons at a pinned commit; every file is SHA-256 verified.
+# Logos belong to their respective projects. Services without a logo keep a drawn glyph.
+set -euo pipefail
+cd "$(dirname "$0")"
+C=d3b9234dd56f3af5862f06741f0dce101193b3df
+mkdir -p icons
+while read -r sum name; do
+  curl -fsSL "https://raw.githubusercontent.com/homarr-labs/dashboard-icons/$C/svg/$name" -o "icons/$name"
+  echo "$sum  icons/$name" | sha256sum -c --quiet -
+done <<'LIST'
+4a65b23ae16bf700f35139e2c10a5f731a32530f2db832abd5612be2523b1f9f  adguard-home.svg
+c59f2d66b5c4038625a38b19e9d27de63d639dc80e56865ff8f92d7d4da3941f  caddy.svg
+7de45e1ea203da32a040c257f47cd39a5711b3a200d27ec72dbccbc5efb1590b  docker.svg
+6e2da0b8fbd4e0eec778714f5009361eb0a339967e06d265f3d7d0d50418d7c7  gitea.svg
+8f32897073ee93594ab2339482ef21ca3767044055da89e2baf9066d25592df7  grafana.svg
+146b366b8c09502742025c4bca4e029e8e4a1b277db837d59a23b93940ebe0e0  home-assistant.svg
+a5d4a43899e63ffc7e97246034f7f63cdfdc410aa803c5713d545290601c4d89  immich.svg
+7f53cf083dbb3119ec8c5acbd8049c5033227617e461540f70591ac109124306  jellyfin.svg
+d576b0a2d83f4035b0e8d02b6534c996ac43f768745e95acd768ab17f8f772dc  mariadb.svg
+8883073943d486b2fa1926d1ddff0c042a9e03de6b7d0ee3e9ab008f4338bbc9  mongodb.svg
+0ea79a37711ab5450b20e99800366cd224f6abd5715af07e1bf97914d45a85d5  mysql.svg
+cd8911581c1173c0696dadaeb02f9bb2eb1ff3b6bdf5c64c49b90f7cb70274cf  navidrome.svg
+892404c0c7c74cb22d6c728e967fcf5cb680f7d343db1cdfef92186d44cce6d3  nextcloud.svg
+3860f0d399e48fcaa30f2b21d3cd5e0d693267140f1e28cb2d341981ab8d2f4c  nginx.svg
+44944e34a721797c3271cfc6b15dff81cd6fbbf66c7c96da53a34ed39be06ea5  pi-hole.svg
+ae6e754dc2644c7ad6b41853cdac75812ccaeed4c2f08fcd88d81e2f3ec01dba  plex.svg
+5d1e07021683d15ea67225c60975729f4ee0ed380f3a0fb21ffb2ad00eb6e85b  portainer.svg
+15392b515335ffd08a5a58cb9ed697772b4cf17f4a6af216900f2c774a951da2  postgresql.svg
+b8718698ad8afa9ea526a6081f1077f61d974a66b067005469665cfaf88162a6  prometheus.svg
+c3d07ecdfab432ca97f26cf01fe06dbfc0993b5cb6093827b3de1c7421a6fb95  radarr.svg
+9c3d4a6458094687a5b035b1d890b808b3d6d06584625e0cbe38054d24e3b86d  redis.svg
+a5debe565281eb16b746d75b9ce72e22f2fb15c19b4f55428fdf62b84be79306  sonarr.svg
+65d1430f7522bea0507259929f0033d7c62539d14757d7c6f5b62574eb4da2d3  syncthing.svg
+cfa3645dcf2f595b9219cf8b0a67beced7fb0f025425859820ba044d1041ad98  tailscale.svg
+2c5f633eb532e02147a12f0e8971222129f52a19d7f29d5354fdbef4a00ed0c7  traefik.svg
+f3caa8a8bac253a77fa2ae7e7bc9b062b55a006abd787b111533714152ec744c  uptime-kuma.svg
+40c7baff64efc4f488a23edecc6a0a11376d2ebe8e9207dcdc739883eb1890a1  valkey.svg
+afa3af723b4de7f502d2cc962352842a5cb41026bb5940a9f970cb5271b9472b  vaultwarden.svg
+900c0e96c80d0afb010fa490cb794de761b39cce26437b1f35a13641cfeb7c89  wireguard.svg
+LIST
+echo "icons ok: $(ls icons | wc -l) files"

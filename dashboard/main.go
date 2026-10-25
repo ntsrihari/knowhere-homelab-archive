@@ -4,7 +4,7 @@ import (
     "bufio"
     "bytes"
     "crypto/tls"
-    _ "embed"
+    "embed"
     "encoding/hex"
     "encoding/json"
     "fmt"
@@ -24,6 +24,11 @@ import (
 
 //go:embed index.html
 var indexHTML []byte
+
+//go:embed icons
+var iconFS embed.FS
+
+var iconNameRe = regexp.MustCompile(`^[a-z0-9-]+\.svg$`)
 
 type Reach struct {
     Iface  string `json:"iface"`
@@ -791,7 +796,7 @@ func syncBinds(srv *http.Server, port string, ifs []nic) []string {
 
 func secure(w http.ResponseWriter) {
     h := w.Header()
-    h.Set("Content-Security-Policy", "default-src 'none'; connect-src 'self'; img-src data:; style-src 'unsafe-inline'; script-src 'unsafe-inline'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'")
+    h.Set("Content-Security-Policy", "default-src 'none'; connect-src 'self'; img-src 'self' data:; style-src 'unsafe-inline'; script-src 'unsafe-inline'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'")
     h.Set("X-Content-Type-Options", "nosniff")
     h.Set("Referrer-Policy", "no-referrer")
     h.Set("Cache-Control", "no-store")
@@ -866,6 +871,28 @@ func handler() http.Handler {
             }
         }
     }))
+    mux.HandleFunc("/icons/", func(w http.ResponseWriter, r *http.Request) {
+        if r.Method != http.MethodGet && r.Method != http.MethodHead {
+            http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+            return
+        }
+        name := strings.TrimPrefix(r.URL.Path, "/icons/")
+        if !iconNameRe.MatchString(name) {
+            http.NotFound(w, r)
+            return
+        }
+        b, err := iconFS.ReadFile("icons/" + name)
+        if err != nil {
+            http.NotFound(w, r)
+            return
+        }
+        hd := w.Header()
+        hd.Set("Content-Type", "image/svg+xml")
+        hd.Set("Content-Security-Policy", "default-src 'none'; style-src 'unsafe-inline'; sandbox")
+        hd.Set("X-Content-Type-Options", "nosniff")
+        hd.Set("Cache-Control", "public, max-age=86400")
+        w.Write(b)
+    })
     return mux
 }
 
