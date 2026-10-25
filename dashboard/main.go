@@ -12,6 +12,7 @@ import (
     "log"
     "net"
     "net/http"
+    "net/url"
     "os"
     "path/filepath"
     "regexp"
@@ -19,6 +20,7 @@ import (
     "strconv"
     "strings"
     "sync"
+    "syscall"
     "time"
 )
 
@@ -47,6 +49,7 @@ type PortInfo struct {
     Scheme   string  `json:"scheme,omitempty"`
     Reach    []Reach `json:"reach"`
     Aliases  []Alias `json:"aliases,omitempty"`
+    Embed    string  `json:"embed,omitempty"`
 }
 
 type Alias struct {
@@ -598,6 +601,443 @@ func aliasURLs(scheme string, port int, short, fqdn string) []Alias {
     return out
 }
 
+// ---------- can this app be shown inside another page? ----------
+
+type embedRes struct {
+    v  string
+    at time.Time
+}
+
+var (
+    embMu    sync.Mutex
+    embCache = map[string]embedRes{}
+    embBusy  = map[string]bool{}
+)
+
+func doEmbedCheck(scheme, ip string, port int) string {
+    cl := &http.Client{
+        Timeout:   3 * time.Second,
+        Transport: &http.Transport{TLSClientConfig: &tls.Config{InsecureSkipVerify: true}}, // header check only
+        CheckRedirect: func(r *http.Request, via []*http.Request) error {
+            if len(via) >= 3 {
+                return http.ErrUseLastResponse
+            }
+            return nil
+        },
+    }
+    resp, err := cl.Get(scheme + "://" + net.JoinHostPort(ip, strconv.Itoa(port)) + "/")
+    if err != nil {
+        return ""
+    }
+    defer resp.Body.Close()
+    io.Copy(io.Discard, io.LimitReader(resp.Body, 4096))
+    xfo := strings.ToLower(resp.Header.Get("X-Frame-Options"))
+    if strings.Contains(xfo, "deny") || strings.Contains(xfo, "sameorigin") {
+        return "blocked"
+    }
+    csp := strings.ToLower(strings.Join(resp.Header.Values("Content-Security-Policy"), ";"))
+    if i := strings.Index(csp, "frame-ancestors"); i >= 0 {
+        rest := csp[i+len("frame-ancestors"):]
+        if j := strings.Index(rest, ";"); j >= 0 {
+            rest = rest[:j]
+        }
+        if !strings.Contains(rest, "*") {
+            return "blocked"
+        }
+    }
+    return "ok"
+}
+
+func embedFor(sk sock, scheme string) string {
+    var ip string
+    switch {
+    case sk.ip.IsUnspecified():
+        ip = "::1"
+        if sk.ip.To4() != nil {
+            ip = "127.0.0.1"
+        }
+    case sk.ip.IsLinkLocalUnicast():
+        return ""
+    default:
+        ip = sk.ip.String()
+    }
+    key := fmt.Sprintf("%s|%s|%d|%d", scheme, ip, sk.port, sk.inode)
+    embMu.Lock()
+    defer embMu.Unlock()
+    r, ok := embCache[key]
+    ttl := 10 * time.Minute
+    if r.v == "" {
+        ttl = 30 * time.Second
+    }
+    if (!ok || time.Since(r.at) > ttl) && !embBusy[key] {
+        embBusy[key] = true
+        go func(port int) {
+            v := doEmbedCheck(scheme, ip, port)
+            embMu.Lock()
+            embCache[key] = embedRes{v, time.Now()}
+            delete(embBusy, key)
+            embMu.Unlock()
+        }(sk.port)
+    }
+    return r.v
+}
+
+// ---------- host metrics (read-only, from /proc and /sys) ----------
+
+type SysInfo struct {
+    CPU    float64 `json:"cpu"`
+    Cores  int     `json:"cores"`
+    MemUse uint64  `json:"mem_used"`
+    MemTot uint64  `json:"mem_total"`
+    Load1  float64 `json:"load1"`
+    Load5  float64 `json:"load5"`
+    Load15 float64 `json:"load15"`
+    Uptime int64   `json:"uptime"`
+    TempC  float64 `json:"temp_c,omitempty"`
+}
+
+var (
+    sysMu  sync.RWMutex
+    sysCur SysInfo
+)
+
+func readCPU() (idle, total uint64, cores int) {
+    b, err := os.ReadFile("/proc/stat")
+    if err != nil {
+        return
+    }
+    for i, ln := range strings.Split(string(b), "\n") {
+        f := strings.Fields(ln)
+        if len(f) < 5 || !strings.HasPrefix(f[0], "cpu") {
+            continue
+        }
+        if i > 0 {
+            cores++
+            continue
+        }
+        for j, x := range f[1:] {
+            n, _ := strconv.ParseUint(x, 10, 64)
+            total += n
+            if j == 3 || j == 4 {
+                idle += n
+            }
+        }
+    }
+    return
+}
+
+func sampleSys() {
+    pi, pt, _ := readCPU()
+    for {
+        time.Sleep(2 * time.Second)
+        i, t, cores := readCPU()
+        s := SysInfo{Cores: cores}
+        if t > pt {
+            s.CPU = 100 * float64((t-pt)-(i-pi)) / float64(t-pt)
+        }
+        pi, pt = i, t
+        if b, err := os.ReadFile("/proc/meminfo"); err == nil {
+            var total, avail uint64
+            for _, ln := range strings.Split(string(b), "\n") {
+                f := strings.Fields(ln)
+                if len(f) < 2 {
+                    continue
+                }
+                n, _ := strconv.ParseUint(f[1], 10, 64)
+                switch f[0] {
+                case "MemTotal:":
+                    total = n * 1024
+                case "MemAvailable:":
+                    avail = n * 1024
+                }
+            }
+            s.MemTot, s.MemUse = total, total-avail
+        }
+        if b, err := os.ReadFile("/proc/loadavg"); err == nil {
+            f := strings.Fields(string(b))
+            if len(f) >= 3 {
+                s.Load1, _ = strconv.ParseFloat(f[0], 64)
+                s.Load5, _ = strconv.ParseFloat(f[1], 64)
+                s.Load15, _ = strconv.ParseFloat(f[2], 64)
+            }
+        }
+        if b, err := os.ReadFile("/proc/uptime"); err == nil {
+            f := strings.Fields(string(b))
+            if len(f) > 0 {
+                u, _ := strconv.ParseFloat(f[0], 64)
+                s.Uptime = int64(u)
+            }
+        }
+        zones, _ := filepath.Glob("/sys/class/thermal/thermal_zone*/temp")
+        for _, z := range zones {
+            if b, err := os.ReadFile(z); err == nil {
+                if v, err := strconv.ParseFloat(strings.TrimSpace(string(b)), 64); err == nil && v/1000 > s.TempC {
+                    s.TempC = v / 1000
+                }
+            }
+        }
+        sysMu.Lock()
+        sysCur = s
+        sysMu.Unlock()
+    }
+}
+
+// ---------- file explorer (read-only; Tailscale and loopback clients only) ----------
+
+var hostRoot = func() string {
+    if v, ok := os.LookupEnv("DASHBOARD_HOST_ROOT"); ok {
+        return strings.TrimRight(v, "/")
+    }
+    return "/proc/1/root"
+}()
+
+var fileRoots = func() []string {
+    v := os.Getenv("DASHBOARD_FILE_ROOTS")
+    if v == "" {
+        v = "/srv,/opt,/mnt,/home,/var/log"
+    }
+    var out []string
+    for _, p := range strings.Split(v, ",") {
+        p = filepath.Clean(strings.TrimSpace(p))
+        if strings.HasPrefix(p, "/") && p != "/" {
+            out = append(out, p)
+        }
+    }
+    return out
+}()
+
+var denyName = regexp.MustCompile(`(?i)^(\.env(\..*)?|.*\.(pem|key|pfx|p12|kdbx|ovpn)|id_(rsa|dsa|ecdsa|ed25519)|shadow-?|gshadow-?|\.netrc|\.npmrc|\.pgpass|\.git-credentials|\.bash_history|\.zsh_history|\.python_history|\.psql_history|\.mysql_history|\.viminfo|\.ssh|\.gnupg|\.aws|\.kube|\.docker|secrets?)$`)
+
+func trusted(r *http.Request) bool {
+    h, _, err := net.SplitHostPort(r.RemoteAddr)
+    if err != nil {
+        return false
+    }
+    ip := net.ParseIP(h)
+    return ip != nil && (ip.IsLoopback() || cgnat.Contains(ip))
+}
+
+func jsonErr(w http.ResponseWriter, code int, msg string) {
+    w.Header().Set("Content-Type", "application/json")
+    w.WriteHeader(code)
+    json.NewEncoder(w).Encode(map[string]string{"error": msg})
+}
+
+func inRoots(p string) bool {
+    for _, r := range fileRoots {
+        if p == r || strings.HasPrefix(p, r+"/") {
+            return true
+        }
+    }
+    return false
+}
+
+// Maps a user-supplied absolute path onto the host filesystem. Symbolic links are never followed.
+func fsResolve(p string) (string, string, error) {
+    if p == "" || strings.ContainsRune(p, 0) || !strings.HasPrefix(p, "/") {
+        return "", "", fmt.Errorf("bad path")
+    }
+    v := filepath.Clean(p)
+    if !inRoots(v) {
+        return "", "", fmt.Errorf("outside the allowed folders")
+    }
+    cur := hostRoot
+    for _, seg := range strings.Split(strings.Trim(v, "/"), "/") {
+        if denyName.MatchString(seg) {
+            return "", "", fmt.Errorf("protected name")
+        }
+        cur += "/" + seg
+        fi, err := os.Lstat(cur)
+        if err != nil {
+            return "", "", fmt.Errorf("not found")
+        }
+        if fi.Mode()&os.ModeSymlink != 0 {
+            return "", "", fmt.Errorf("symbolic links are not followed")
+        }
+    }
+    return hostRoot + v, v, nil
+}
+
+var (
+    pwMu  sync.Mutex
+    pwAt  time.Time
+    pwMap = map[uint32]string{}
+)
+
+func ownerName(uid uint32) string {
+    pwMu.Lock()
+    defer pwMu.Unlock()
+    if time.Since(pwAt) > time.Minute {
+        pwMap = map[uint32]string{}
+        if b, err := os.ReadFile(hostRoot + "/etc/passwd"); err == nil {
+            for _, ln := range strings.Split(string(b), "\n") {
+                f := strings.Split(ln, ":")
+                if len(f) > 2 {
+                    if n, err := strconv.ParseUint(f[2], 10, 32); err == nil {
+                        pwMap[uint32(n)] = f[0]
+                    }
+                }
+            }
+        }
+        pwAt = time.Now()
+    }
+    if n, ok := pwMap[uid]; ok {
+        return n
+    }
+    return strconv.Itoa(int(uid))
+}
+
+type fsEntry struct {
+    Name   string `json:"name"`
+    Type   string `json:"type"`
+    Size   int64  `json:"size"`
+    MTime  int64  `json:"mtime"`
+    Mode   string `json:"mode"`
+    Owner  string `json:"owner,omitempty"`
+    Target string `json:"target,omitempty"`
+}
+
+func fsGate(f http.HandlerFunc) http.HandlerFunc {
+    return func(w http.ResponseWriter, r *http.Request) {
+        if !trusted(r) {
+            jsonErr(w, http.StatusForbidden, "available over Tailscale or on the server only")
+            return
+        }
+        f(w, r)
+    }
+}
+
+func fsRoots(w http.ResponseWriter, r *http.Request) {
+    type root struct {
+        Path  string `json:"path"`
+        Total uint64 `json:"total"`
+        Free  uint64 `json:"free"`
+        OK    bool   `json:"ok"`
+    }
+    out := struct {
+        Trusted bool   `json:"trusted"`
+        Roots   []root `json:"roots"`
+    }{Trusted: trusted(r), Roots: []root{}}
+    if out.Trusted {
+        for _, p := range fileRoots {
+            rt := root{Path: p}
+            var st syscall.Statfs_t
+            if err := syscall.Statfs(hostRoot+p, &st); err == nil {
+                rt.OK, rt.Total, rt.Free = true, st.Blocks*uint64(st.Bsize), st.Bavail*uint64(st.Bsize)
+            }
+            out.Roots = append(out.Roots, rt)
+        }
+    }
+    w.Header().Set("Content-Type", "application/json")
+    json.NewEncoder(w).Encode(out)
+}
+
+func fsList(w http.ResponseWriter, r *http.Request) {
+    real, v, err := fsResolve(r.URL.Query().Get("path"))
+    if err != nil {
+        jsonErr(w, http.StatusBadRequest, err.Error())
+        return
+    }
+    ents, err := os.ReadDir(real)
+    if err != nil {
+        jsonErr(w, http.StatusBadRequest, "cannot read this folder")
+        return
+    }
+    out := struct {
+        Path      string    `json:"path"`
+        Parent    string    `json:"parent"`
+        Entries   []fsEntry `json:"entries"`
+        Truncated bool      `json:"truncated,omitempty"`
+    }{Path: v, Entries: []fsEntry{}}
+    isRoot := false
+    for _, rt := range fileRoots {
+        if rt == v {
+            isRoot = true
+        }
+    }
+    if !isRoot {
+        out.Parent = filepath.Dir(v)
+    }
+    for i, e := range ents {
+        if i >= 3000 {
+            out.Truncated = true
+            break
+        }
+        if denyName.MatchString(e.Name()) {
+            continue
+        }
+        fi, err := e.Info()
+        if err != nil {
+            continue
+        }
+        fe := fsEntry{Name: e.Name(), Size: fi.Size(), MTime: fi.ModTime().Unix(), Mode: fi.Mode().Perm().String()}
+        switch {
+        case fi.Mode()&os.ModeSymlink != 0:
+            fe.Type = "link"
+            fe.Target, _ = os.Readlink(real + "/" + e.Name())
+        case fi.IsDir():
+            fe.Type = "dir"
+        case fi.Mode().IsRegular():
+            fe.Type = "file"
+        default:
+            fe.Type = "other"
+        }
+        if st, ok := fi.Sys().(*syscall.Stat_t); ok {
+            fe.Owner = ownerName(st.Uid)
+        }
+        out.Entries = append(out.Entries, fe)
+    }
+    w.Header().Set("Content-Type", "application/json")
+    json.NewEncoder(w).Encode(out)
+}
+
+var imgTypes = map[string]string{".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".gif": "image/gif", ".webp": "image/webp", ".bmp": "image/bmp", ".ico": "image/x-icon", ".svg": "image/svg+xml"}
+
+func fsRaw(w http.ResponseWriter, r *http.Request) {
+    real, v, err := fsResolve(r.URL.Query().Get("path"))
+    if err != nil {
+        jsonErr(w, http.StatusBadRequest, err.Error())
+        return
+    }
+    f, err := os.Open(real)
+    if err != nil {
+        jsonErr(w, http.StatusBadRequest, "cannot open this file")
+        return
+    }
+    defer f.Close()
+    fi, err := f.Stat()
+    if err != nil || !fi.Mode().IsRegular() {
+        jsonErr(w, http.StatusBadRequest, "not a regular file")
+        return
+    }
+    h := w.Header()
+    h.Set("Content-Security-Policy", "default-src 'none'; style-src 'unsafe-inline'; sandbox")
+    if r.URL.Query().Get("dl") == "1" {
+        h.Set("Content-Type", "application/octet-stream")
+        h.Set("Content-Disposition", "attachment; filename*=UTF-8''"+url.PathEscape(filepath.Base(v)))
+        h.Set("Content-Length", strconv.FormatInt(fi.Size(), 10))
+        io.Copy(w, f)
+        return
+    }
+    if ct, ok := imgTypes[strings.ToLower(filepath.Ext(v))]; ok {
+        h.Set("Content-Type", ct)
+        io.Copy(w, io.LimitReader(f, 25<<20))
+        return
+    }
+    buf := make([]byte, 1<<20)
+    n, _ := io.ReadFull(f, buf)
+    buf = buf[:n]
+    if bytes.IndexByte(buf[:min(n, 8192)], 0) >= 0 {
+        jsonErr(w, http.StatusUnsupportedMediaType, "binary file")
+        return
+    }
+    h.Set("Content-Type", "text/plain; charset=utf-8")
+    if fi.Size() > int64(n) {
+        h.Set("X-Truncated", "1")
+    }
+    w.Write(buf)
+}
+
 // ---------- snapshot assembly ----------
 
 func collect(ifs []nic, binds []string) Snapshot {
@@ -702,6 +1142,9 @@ func collect(ifs []nic, binds []string) Snapshot {
         pi := PortInfo{Proto: sk.proto, Bind: sk.ip.String(), Port: sk.port,
             Wildcard: sk.ip.IsUnspecified(), Scheme: scheme, Reach: reachFor(sk.ip, sk.port, scheme, ifs)}
         if scheme != "" {
+            pi.Embed = embedFor(sk, scheme)
+        }
+        if scheme != "" {
             for _, r := range pi.Reach {
                 if r.Group == "tailnet" {
                     pi.Aliases = aliasURLs(scheme, sk.port, short, fqdn)
@@ -796,7 +1239,7 @@ func syncBinds(srv *http.Server, port string, ifs []nic) []string {
 
 func secure(w http.ResponseWriter) {
     h := w.Header()
-    h.Set("Content-Security-Policy", "default-src 'none'; connect-src 'self'; img-src 'self' data:; style-src 'unsafe-inline'; script-src 'unsafe-inline'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'")
+    h.Set("Content-Security-Policy", "default-src 'none'; connect-src 'self'; frame-src http: https:; img-src 'self' data:; style-src 'unsafe-inline'; script-src 'unsafe-inline'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'")
     h.Set("X-Content-Type-Options", "nosniff")
     h.Set("Referrer-Policy", "no-referrer")
     h.Set("Cache-Control", "no-store")
@@ -871,6 +1314,16 @@ func handler() http.Handler {
             }
         }
     }))
+    mux.HandleFunc("/api/sys", get(func(w http.ResponseWriter, r *http.Request) {
+        sysMu.RLock()
+        b, _ := json.Marshal(sysCur)
+        sysMu.RUnlock()
+        w.Header().Set("Content-Type", "application/json")
+        w.Write(b)
+    }))
+    mux.HandleFunc("/api/fs/roots", get(fsRoots))
+    mux.HandleFunc("/api/fs/list", get(fsGate(fsList)))
+    mux.HandleFunc("/api/fs/raw", get(fsGate(fsRaw)))
     mux.HandleFunc("/icons/", func(w http.ResponseWriter, r *http.Request) {
         if r.Method != http.MethodGet && r.Method != http.MethodHead {
             http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
@@ -910,6 +1363,7 @@ func main() {
         os.Exit(0)
     }
     srv := &http.Server{Handler: handler(), ReadHeaderTimeout: 5 * time.Second}
+    go sampleSys()
     for {
         ifs := gatherNics()
         binds := syncBinds(srv, port, ifs)
