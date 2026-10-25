@@ -1,0 +1,17 @@
+[Unit]
+Description=qBittorrent Compose Stack
+Requires=docker.service
+After=docker.service
+RequiresMountsFor=/mnt/media
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+WorkingDirectory=/opt/homelab/qbittorrent
+ExecStartPre=/bin/sh -ec 'test "$(/usr/bin/readlink -f /dev/disk/by-uuid/D09481079480F0F0)" = "$(/usr/bin/findmnt --noheadings --output SOURCE --mountpoint /mnt/media)"; /usr/bin/findmnt --noheadings --output OPTIONS --mountpoint /mnt/media | /usr/bin/grep -Eq "(^|,)rw(,|$)"; test -d /mnt/media/Media/Movies; test -d /mnt/media/Media/Shows; test -d /mnt/media/Media/Music; test -d /srv/appdata/qbittorrent'
+ExecStart=/usr/bin/docker compose up -d
+ExecStop=/usr/bin/docker compose stop
+TimeoutStartSec=0
+
+[Install]
+WantedBy=multi-user.target
