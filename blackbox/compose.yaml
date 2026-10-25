@@ -1,0 +1,30 @@
+services:
+  blackbox:
+    build:
+      context: .
+    container_name: knowhere-blackbox
+    restart: unless-stopped
+    read_only: true
+    env_file:
+      - .env
+    environment:
+      PORT: "8000"
+      BLACKBOX_DB: /data/blackbox.sqlite3
+      BLACKBOX_IMPORT_DIR: /imports
+    ports:
+      - "8787:8000"
+    volumes:
+      - ${BLACKBOX_DATA_DIR:-/srv/appdata/blackbox}:/data
+      - ${BLACKBOX_IMPORT_DIR:-./private-imports}:/imports:ro
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    tmpfs:
+      - /tmp:size=16m,noexec,nosuid
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/health',timeout=2)"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 15s

@@ -1,0 +1,50 @@
+name: dashboard
+
+services:
+  # Read-only view of the Docker API: container list only. POST (any change) is disabled.
+  # Published on loopback only so nothing on the LAN or tailnet can reach it.
+  socket-proxy:
+    image: tecnativa/docker-socket-proxy:latest
+    container_name: dashboard-socket-proxy
+    restart: unless-stopped
+    environment:
+      CONTAINERS: "1"
+      POST: "0"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    ports:
+      - "127.0.0.1:2375:2375"
+    security_opt:
+      - no-new-privileges:true
+
+  dashboard:
+    build: .
+    image: knowhere-dashboard:local
+    container_name: dashboard
+    restart: unless-stopped
+    # Host network: sees the real interfaces and sockets, and binds port 80 itself
+    # (IPv4 on LAN, tailscale and loopback addresses only, discovered at runtime).
+    network_mode: host
+    # Host PID namespace + ptrace + unconfined AppArmor: required to learn which host process
+    # owns each listening socket (sshd, tailscaled, ...). Verified on this host: with the default
+    # AppArmor profile host process names do not resolve. This is a trade-off: the container is
+    # read-only and exposes no write path, but it is close to root-equivalent on the host.
+    pid: host
+    # Host cgroup namespace: lets the collector map every process, including this container's
+    # own, to a container id (otherwise the dashboard is listed twice: container and host process).
+    cgroup: host
+    cap_add:
+      - SYS_PTRACE
+    security_opt:
+      - apparmor:unconfined
+      - no-new-privileges:true
+    read_only: true
+    environment:
+      DOCKER_HOST: tcp://127.0.0.1:2375
+    depends_on:
+      - socket-proxy
+    healthcheck:
+      test: ["CMD", "/dashboard", "-healthcheck"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
