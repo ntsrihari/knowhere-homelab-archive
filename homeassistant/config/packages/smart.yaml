@@ -1,0 +1,143 @@
+# Hands-free extras: rain and heat warnings, photo-disk forecast, an evening summary on the TV.
+# Nothing here needs an account, a device or typing.
+
+template:
+  # Weather lookahead, refreshed every 20 minutes from the forecast (met.no).
+  - triggers:
+      - trigger: time_pattern
+        minutes: "/20"
+      - trigger: homeassistant
+        event: start
+    actions:
+      - action: weather.get_forecasts
+        target: { entity_id: weather.forecast_home }
+        data: { type: hourly }
+        response_variable: hourly
+      - action: weather.get_forecasts
+        target: { entity_id: weather.forecast_home }
+        data: { type: daily }
+        response_variable: daily
+    binary_sensor:
+      - name: Rain soon
+        unique_id: rain_soon
+        icon: mdi:weather-pouring
+        delay_off: { hours: 1 }
+        # Rain expected in the next 3 hours.
+        state: >
+          {% set f = hourly['weather.forecast_home'].forecast[:3] %}
+          {{ f | selectattr('condition', 'in', ['rainy', 'pouring', 'lightning-rainy', 'hail']) | list | count > 0
+             or f | map(attribute='precipitation') | map('float', 0) | max >= 0.5 }}
+        attributes:
+          when: >
+            {% set f = hourly['weather.forecast_home'].forecast[:3] %}
+            {% set r = f | selectattr('condition', 'in', ['rainy', 'pouring', 'lightning-rainy', 'hail']) | list %}
+            {{ (r[0].datetime | as_datetime | as_local).strftime('%H:%M') if r else '' }}
+    sensor:
+      - name: Today's high
+        unique_id: today_high
+        unit_of_measurement: "°C"
+        device_class: temperature
+        state: "{{ daily['weather.forecast_home'].forecast[0].temperature }}"
+      - name: Tomorrow's weather
+        unique_id: tomorrow_weather
+        icon: mdi:weather-partly-cloudy
+        state: >
+          {% set d = daily['weather.forecast_home'].forecast[1] %}
+          {{ d.condition | replace('-', ' ') | capitalize }}, {{ d.templow | round(0) }}-{{ d.temperature | round(0) }}°
+          {%- if d.precipitation | float(0) > 0 %}, {{ d.precipitation }} mm rain{% endif %}
+
+  - sensor:
+      - name: Photos disk days left
+        unique_id: photos_disk_days_left
+        unit_of_measurement: d
+        icon: mdi:harddisk-remove
+        # Days until 95% full at the last day's growth rate.
+        state: >
+          {% set used = states('sensor.photos_disk_used') | float(0) %}
+          {% set rate = states('sensor.photos_disk_growth') | float(0) %}
+          {{ ((95 - used) / rate) | round(0) | int if rate > 0.01 and used < 95 else 999 }}
+
+sensor:
+  - platform: derivative
+    source: sensor.photos_disk_used
+    name: Photos disk growth
+    unique_id: photos_disk_growth
+    unit_time: d
+    time_window: "24:00:00"
+    round: 3
+
+automation:
+  - id: smart_rain_soon
+    alias: "Weather · rain soon"
+    description: "Rain expected in the next 3 hours: a card on the TV and a note in Home Assistant."
+    triggers:
+      - trigger: state
+        entity_id: binary_sensor.rain_soon
+        from: "off"
+        to: "on"
+    conditions:
+      - condition: time
+        after: "06:30:00"
+        before: "23:00:00"
+    actions:
+      - action: persistent_notification.create
+        data:
+          notification_id: rain_soon
+          title: Rain soon
+          message: "Rain expected{{ ' around ' ~ state_attr('binary_sensor.rain_soon', 'when') if state_attr('binary_sensor.rain_soon', 'when') }}. Clothes outside? Windows open?"
+      - action: script.tv_popup
+        data:
+          title: Rain soon
+          message: "Expected{{ ' around ' ~ state_attr('binary_sensor.rain_soon', 'when') if state_attr('binary_sensor.rain_soon', 'when') }}. Bring the clothes in, close the windows."
+          color: "#5AA9E6"
+          seconds: 15
+
+  - id: smart_heat_warning
+    alias: "Weather · hot day"
+    description: "At 12:30, if today's high is 38 °C or more: a hydration reminder on the TV."
+    triggers:
+      - trigger: time
+        at: "12:30:00"
+    conditions:
+      - condition: numeric_state
+        entity_id: sensor.today_s_high
+        above: 37.9
+    actions:
+      - action: script.tv_popup
+        data:
+          title: "Hot day: {{ states('sensor.today_s_high') | round(0) }}°"
+          message: Drink water, keep the curtains drawn.
+          color: "#F28C38"
+          seconds: 12
+
+  - id: smart_photos_disk
+    alias: "knowhere · photos disk filling up"
+    description: "When the photos disk is forecast to be 95% full within 3 weeks."
+    triggers:
+      - trigger: numeric_state
+        entity_id: sensor.photos_disk_days_left
+        below: 21
+    actions:
+      - action: persistent_notification.create
+        data:
+          title: Photos disk filling up
+          message: "At {{ states('sensor.photos_disk_used') }}% and growing {{ states('sensor.photos_disk_growth') }}% a day: about {{ states('sensor.photos_disk_days_left') }} days to 95%."
+
+  - id: smart_evening_summary
+    alias: "Home · evening summary on the TV"
+    description: "At 21:30, if the TV is on: today's electricity, TV time, ads blocked, internet outages and tomorrow's weather."
+    triggers:
+      - trigger: time
+        at: "21:30:00"
+    actions:
+      - action: script.tv_popup
+        data:
+          title: Today at home
+          message: >-
+            {{ states('sensor.msedcl_today') | float(0) | round(1) }} units ·
+            TV {{ (states('sensor.tv_playing_today') | float(0)) | round(1) }} h ·
+            {{ states('sensor.ads_blocked_today') }} ads blocked ·
+            {% set d = states('sensor.internet_down_today') | float(0) %}{{ 'internet down ' ~ (d * 60) | round(0) | int ~ ' min' if d > 0.01 else 'internet steady' }}.
+            Tomorrow: {{ states('sensor.tomorrow_s_weather') }}
+          color: "#9D7CD8"
+          seconds: 20

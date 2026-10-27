@@ -11,6 +11,7 @@ Home Assistant runs in Docker (`homeassistant/compose.yaml`, host networking, `T
 | `config/configuration.yaml` | `/config/configuration.yaml` | Base config: packages, the "Home control" YAML dashboard, srihari-pc ping sensor |
 | `config/packages/home_center.yaml` | `/config/packages/` | Home feed sensors, presence, TV pop-up and Wake PC scripts, automations |
 | `config/packages/msedcl.yaml` | `/config/packages/` | Electricity: estimated per-device power, kWh, MSEDCL slab bill and forecast |
+| `config/packages/smart.yaml` | `/config/packages/` | Rain-soon and hot-day warnings, photo-disk days-left forecast, evening summary on the TV |
 | `config/packages/extras.yaml` | `/config/packages/` | Internet health, Pi-hole stats, message board for the TV |
 | `config/dashboards/home.yaml` | `/config/dashboards/home.yaml` | The "Home control" dashboard |
 | `config/scripts.yaml`, `config/automations.yaml` | `/config/` | TV scripts (apps, HDMI, sleep, movie night) and the night auto-off |
@@ -55,4 +56,4 @@ dashboard. Tune "Everything else" once from a real bill.
 
 Welcome home, TV on while away (notice only), new device on the Wi-Fi, knowhere needs attention, PC came on, bedtime
 nudge 00:20, three hours of TV, good morning card, TV night auto-off, over 300 units this month, internet down and
-back (with outage length).
+back (with outage length), rain soon, hot day, photos disk filling up, evening summary at 21:30.

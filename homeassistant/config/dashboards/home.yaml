@@ -11,6 +11,24 @@ views:
           - type: heading
             heading: Home
             icon: mdi:home
+          - type: markdown
+            grid_options: { columns: full }
+            content: >-
+              {% set h = now().hour %}
+              ### {{ 'Good morning' if h < 12 else 'Good afternoon' if h < 17 else 'Good evening' }}
+
+              {{ states('weather.forecast_home') | replace('-', ' ') | capitalize }}, {{ state_attr('weather.forecast_home', 'temperature') }}° now, high {{ states('sensor.today_s_high') }}°
+              {%- if is_state('binary_sensor.rain_soon', 'on') %} · ☔ **rain soon**{% endif %}
+
+              ⚡ {{ states('sensor.home_power') | float(0) | round(0) | int }} W now · {{ states('sensor.msedcl_today') | float(0) | round(1) }} units today · bill forecast ₹{{ states('sensor.bill_forecast_this_month') }}
+
+              📺 TV {{ states('sensor.tv_playing_today') | float(0) | round(1) }} h today · 🛡️ {{ states('sensor.ads_blocked_today') }} ads blocked ·
+              {{ '🌐 internet up' if is_state('binary_sensor.internet', 'on') else '🔴 **internet down**' }} ({{ states('sensor.internet_latency') }} ms)
+
+              🖥️ knowhere {{ states('sensor.knowhere_temperature') }}° · {{ states('sensor.services_down') | int(0) }} services down · photos disk {{ states('sensor.photos_disk_used') }}%
+              {%- set d = states('sensor.photos_disk_days_left') | int(999) %}{% if d < 999 %} (~{{ d }} days to full){% endif %}
+
+              Tomorrow: {{ states('sensor.tomorrow_s_weather') }}
           - type: tile
             entity: binary_sensor.srihari_home
             name: Srihari
