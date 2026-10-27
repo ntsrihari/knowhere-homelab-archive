@@ -1,0 +1,77 @@
+# Fire TV buttons. adb_command runs a shell line on the TV over the Android Debug Bridge integration.
+fire_tv_movie_night:
+  alias: Movie night
+  icon: mdi:movie-open
+  description: Wakes the TV and opens Jellyfin.
+  sequence:
+    - action: androidtv.adb_command
+      target: { entity_id: media_player.fire_tv }
+      data: { command: "input keyevent 224" }
+    - delay: { seconds: 2 }
+    - action: androidtv.adb_command
+      target: { entity_id: media_player.fire_tv }
+      data: { command: "monkey -p org.jellyfin.androidtv -c android.intent.category.LEANBACK_LAUNCHER 1" }
+
+fire_tv_open_netflix:
+  alias: TV · Netflix
+  icon: mdi:netflix
+  sequence:
+    - action: androidtv.adb_command
+      target: { entity_id: media_player.fire_tv }
+      data: { command: "monkey -p com.netflix.ninja -c android.intent.category.LEANBACK_LAUNCHER 1" }
+
+fire_tv_open_youtube:
+  alias: TV · YouTube
+  icon: mdi:youtube
+  sequence:
+    - action: androidtv.adb_command
+      target: { entity_id: media_player.fire_tv }
+      data: { command: "monkey -p com.amazon.firetv.youtube -c android.intent.category.LEANBACK_LAUNCHER 1" }
+
+fire_tv_open_hotstar:
+  alias: TV · JioHotstar
+  icon: mdi:television-play
+  sequence:
+    - action: androidtv.adb_command
+      target: { entity_id: media_player.fire_tv }
+      data: { command: "monkey -p in.startv.hotstar -c android.intent.category.LEANBACK_LAUNCHER 1" }
+
+fire_tv_hdmi_1:
+  alias: TV · HDMI 1
+  icon: mdi:video-input-hdmi
+  sequence:
+    - action: androidtv.adb_command
+      target: { entity_id: media_player.fire_tv }
+      data: { command: "input keyevent 243" }
+
+fire_tv_hdmi_2:
+  alias: TV · HDMI 2
+  icon: mdi:video-input-hdmi
+  sequence:
+    - action: androidtv.adb_command
+      target: { entity_id: media_player.fire_tv }
+      data: { command: "input keyevent 244" }
+
+fire_tv_hdmi_3:
+  alias: TV · HDMI 3
+  icon: mdi:video-input-hdmi
+  sequence:
+    - action: androidtv.adb_command
+      target: { entity_id: media_player.fire_tv }
+      data: { command: "input keyevent 245" }
+
+fire_tv_home:
+  alias: TV · Home screen
+  icon: mdi:home
+  sequence:
+    - action: androidtv.adb_command
+      target: { entity_id: media_player.fire_tv }
+      data: { command: "HOME" }
+
+fire_tv_sleep:
+  alias: TV · Sleep
+  icon: mdi:power-sleep
+  sequence:
+    - action: androidtv.adb_command
+      target: { entity_id: media_player.fire_tv }
+      data: { command: "input keyevent 223" }

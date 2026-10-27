@@ -1,0 +1,316 @@
+# Home centre: the network, presence, knowhere's health, TV pop-ups and the automations on top of them.
+# Data comes from /feed/home.json, written every minute by /opt/homelab/homeassistant/feed/collect.py on knowhere.
+
+wake_on_lan:
+
+recorder:
+  exclude:
+    entities:
+      - sensor.home_feed   # its attributes (every device) are too big to keep in history
+
+command_line:
+  - sensor:
+      name: Home feed
+      unique_id: home_feed
+      command: "cat /feed/home.json"
+      value_template: "{{ value_json.updated | int(0) }}"
+      json_attributes: [tailscale, lan, new_devices, containers, server, internet, pihole]
+      scan_interval: 60
+
+template:
+  - binary_sensor:
+      - name: Srihari home
+        unique_id: srihari_home
+        device_class: presence
+        icon: mdi:home-account
+        # The S25 Ultra reaches knowhere straight from a 192.168.29.x address (Tailscale on in the phone).
+        state: >
+          {{ (state_attr('sensor.home_feed', 'tailscale') or [])
+             | selectattr('name', 'eq', 'sriharis-s25-ultra') | selectattr('at_home') | list | count > 0 }}
+        delay_off: { minutes: 10 }
+      - name: Knowhere problem
+        unique_id: knowhere_problem
+        device_class: problem
+        state: >
+          {% set s = state_attr('sensor.home_feed', 'server') or {} %}
+          {% set d = (s.disk_used_pct or {}).values() | list %}
+          {{ states('sensor.services_down') | int(0) > 0
+             or ((d + [0]) | max) >= 90
+             or (s.temp_max_c or 0) >= 80
+             or states('sensor.home_feed_age') | int(999) > 5 }}
+        attributes:
+          why: >
+            {% set s = state_attr('sensor.home_feed', 'server') or {} %}
+            {% set out = [] %}
+            {% if states('sensor.services_down') | int(0) > 0 %}{% set out = out + ['services down: ' ~ state_attr('sensor.services_down', 'names') | join(', ')] %}{% endif %}
+            {% for m, p in (s.disk_used_pct or {}).items() if p >= 90 %}{% set out = out + [m ~ ' is ' ~ p ~ '% full'] %}{% endfor %}
+            {% if (s.temp_max_c or 0) >= 80 %}{% set out = out + ['hot: ' ~ s.temp_max_c ~ ' °C'] %}{% endif %}
+            {% if states('sensor.home_feed_age') | int(999) > 5 %}{% set out = out + ['the home feed stopped updating'] %}{% endif %}
+            {{ out | join('; ') }}
+  - sensor:
+      - name: Home feed age
+        unique_id: home_feed_age
+        unit_of_measurement: min
+        icon: mdi:timer-sand
+        state: "{{ ((now().timestamp() - states('sensor.home_feed') | int(0)) / 60) | round(0) | int }}"
+      - name: Devices on Wi-Fi
+        unique_id: wifi_devices
+        icon: mdi:wifi
+        unit_of_measurement: devices
+        state: "{{ (state_attr('sensor.home_feed', 'lan') or []) | count }}"
+        attributes:
+          devices: >
+            {{ (state_attr('sensor.home_feed', 'lan') or []) | map(attribute='name') | map('default', '?', true) | list }}
+      - name: New devices on Wi-Fi
+        unique_id: new_wifi_devices
+        icon: mdi:wifi-alert
+        state: "{{ (state_attr('sensor.home_feed', 'new_devices') or []) | count }}"
+        attributes:
+          devices: >
+            {% for d in state_attr('sensor.home_feed', 'new_devices') or [] %}{{ d.ip }} ({{ d.mac }}){{ ', ' if not loop.last }}{% endfor %}
+      - name: Tailnet devices online
+        unique_id: tailnet_online
+        icon: mdi:vpn
+        unit_of_measurement: devices
+        state: "{{ (state_attr('sensor.home_feed', 'tailscale') or []) | selectattr('online') | list | count }}"
+        attributes:
+          at_home: "{{ (state_attr('sensor.home_feed', 'tailscale') or []) | selectattr('at_home') | map(attribute='name') | list }}"
+          away: "{{ (state_attr('sensor.home_feed', 'tailscale') or []) | selectattr('online') | rejectattr('at_home') | map(attribute='name') | list }}"
+      - name: Services down
+        unique_id: services_down
+        icon: mdi:docker
+        state: >
+          {{ (state_attr('sensor.home_feed', 'containers') or [])
+             | selectattr('state', 'ne', 'running') | list | count
+             + (state_attr('sensor.home_feed', 'containers') or []) | selectattr('health', 'eq', 'unhealthy') | list | count }}
+        attributes:
+          names: >
+            {{ ((state_attr('sensor.home_feed', 'containers') or []) | selectattr('state', 'ne', 'running') | map(attribute='name') | list)
+               + ((state_attr('sensor.home_feed', 'containers') or []) | selectattr('health', 'eq', 'unhealthy') | map(attribute='name') | list) }}
+      - name: Knowhere temperature
+        unique_id: knowhere_temperature
+        device_class: temperature
+        unit_of_measurement: "°C"
+        state: "{{ (state_attr('sensor.home_feed', 'server') or {}).temp_max_c }}"
+        availability: "{{ (state_attr('sensor.home_feed', 'server') or {}).temp_max_c is number }}"
+      - name: Knowhere memory used
+        unique_id: knowhere_memory
+        unit_of_measurement: "%"
+        icon: mdi:memory
+        state: "{{ (state_attr('sensor.home_feed', 'server') or {}).mem_used_pct }}"
+      - name: Knowhere load
+        unique_id: knowhere_load
+        icon: mdi:chip
+        state: "{{ (state_attr('sensor.home_feed', 'server') or {}).load5 }}"
+      - name: Photos disk used
+        unique_id: immich_disk
+        unit_of_measurement: "%"
+        icon: mdi:image-multiple
+        state: "{{ ((state_attr('sensor.home_feed', 'server') or {}).disk_used_pct or {}).get('/mnt/immich') }}"
+      - name: Media disk used
+        unique_id: media_disk
+        unit_of_measurement: "%"
+        icon: mdi:filmstrip-box-multiple
+        state: "{{ ((state_attr('sensor.home_feed', 'server') or {}).disk_used_pct or {}).get('/mnt/media') }}"
+      - name: System disk used
+        unique_id: system_disk
+        unit_of_measurement: "%"
+        icon: mdi:harddisk
+        state: "{{ ((state_attr('sensor.home_feed', 'server') or {}).disk_used_pct or {}).get('/') }}"
+
+sensor:
+  - platform: history_stats
+    name: TV playing today
+    unique_id: tv_playing_today
+    entity_id: media_player.fire_tv
+    state: playing
+    type: time
+    start: "{{ today_at() }}"
+    end: "{{ now() }}"
+
+script:
+  tv_popup:
+    alias: TV · Pop-up
+    icon: mdi:message-badge
+    description: Shows a card at the top right of the TV, over whatever is on. Skipped while the TV is off.
+    mode: queued
+    fields:
+      title: { description: Title, example: Welcome home }
+      message: { description: Text, example: The PC is on. }
+      seconds: { description: How long, default: 8, example: 8 }
+      color: { description: Stripe colour, default: "#6E8BFF", example: "#4FC3A1" }
+    sequence:
+      - condition: template
+        value_template: "{{ states('media_player.fire_tv') not in ['off', 'standby', 'unavailable', 'unknown'] }}"
+      - action: androidtv.adb_command
+        target: { entity_id: media_player.fire_tv }
+        data:
+          command: >-
+            am broadcast -a com.gathin.tvhome.action.POPUP -n com.gathin.tvhome/.PopupReceiver
+            --es title '{{ (title | default('')) | replace("'", "’") }}'
+            --es message '{{ (message | default('')) | replace("'", "’") }}'
+            --ei seconds {{ seconds | default(8) | int(8) }}
+            --es color '{{ color | default('#6E8BFF') }}'
+
+  wake_srihari_pc:
+    alias: Wake srihari-pc
+    icon: mdi:desktop-tower-monitor
+    description: Wake-on-LAN to srihari-pc (Gigabyte wired network card). Needs Wake-on-LAN enabled on the PC.
+    sequence:
+      - action: wake_on_lan.send_magic_packet
+        data: { mac: "XX:XX:XX:XX:XX:XX", broadcast_address: 192.168.29.255 }
+
+automation:
+  - id: home_welcome_on_tv
+    alias: "Home · welcome on the TV"
+    description: When Srihari's phone is back on the home network and the TV is on.
+    triggers:
+      - trigger: state
+        entity_id: binary_sensor.srihari_home
+        from: "off"
+        to: "on"
+    actions:
+      - action: script.tv_popup
+        data:
+          title: "Welcome home, Srihari"
+          message: >-
+            {{ states('sensor.devices_on_wi_fi') }} devices on the Wi-Fi ·
+            {{ states('weather.forecast_home') | replace('-', ' ') }}, {{ state_attr('weather.forecast_home', 'temperature') }}°
+          color: "#4FC3A1"
+
+  - id: home_tv_left_on
+    alias: "Home · TV on while you're away"
+    description: "Your phone has been away 20 minutes and the TV is on: a notice only (family may be watching). Sleep it from Home control."
+    triggers:
+      - trigger: state
+        entity_id: binary_sensor.srihari_home
+        to: "off"
+        for: { minutes: 20 }
+      - trigger: state
+        entity_id: media_player.fire_tv
+        to: [idle, playing, paused, "on"]
+        for: { minutes: 20 }
+    conditions:
+      - condition: state
+        entity_id: binary_sensor.srihari_home
+        state: "off"
+        for: { minutes: 20 }
+      - condition: template
+        value_template: "{{ states('media_player.fire_tv') not in ['off', 'standby', 'unavailable', 'unknown'] }}"
+    actions:
+      - action: persistent_notification.create
+        data:
+          title: The TV is on at home
+          message: "On since before {{ now().strftime('%H:%M') }} while you're away. Home control > TV > Sleep turns it off."
+
+  - id: home_new_device
+    alias: "Home · new device on the Wi-Fi"
+    description: A device the network has never seen before joins. Told on the TV and in Home Assistant.
+    triggers:
+      - trigger: state
+        entity_id: sensor.new_devices_on_wi_fi
+    conditions:
+      - condition: template
+        value_template: "{{ trigger.to_state.state | int(0) > trigger.from_state.state | int(0) }}"
+    actions:
+      - action: persistent_notification.create
+        data:
+          title: New device on the Wi-Fi
+          message: "{{ state_attr('sensor.new_devices_on_wi_fi', 'devices') }}. Name it in /opt/homelab/homeassistant/feed/names.json."
+      - action: script.tv_popup
+        data:
+          title: New device on the Wi-Fi
+          message: "{{ state_attr('sensor.new_devices_on_wi_fi', 'devices') }}"
+          color: "#E8A84C"
+          seconds: 12
+
+  - id: home_server_problem
+    alias: "Home · knowhere needs attention"
+    description: A service is down or unhealthy, a disk is 90% full, it runs hot, or the home feed stopped.
+    mode: single
+    triggers:
+      - trigger: state
+        entity_id: binary_sensor.knowhere_problem
+        to: "on"
+        for: { minutes: 3 }
+    actions:
+      - action: persistent_notification.create
+        data:
+          title: knowhere needs attention
+          message: "{{ state_attr('binary_sensor.knowhere_problem', 'why') }}"
+      - action: script.tv_popup
+        data:
+          title: knowhere needs attention
+          message: "{{ state_attr('binary_sensor.knowhere_problem', 'why') }}"
+          color: "#E5737F"
+          seconds: 15
+
+  - id: home_pc_online
+    alias: "Home · srihari-pc came on"
+    triggers:
+      - trigger: state
+        entity_id: binary_sensor.srihari_pc
+        from: "off"
+        to: "on"
+    actions:
+      - action: script.tv_popup
+        data:
+          title: srihari-pc is on
+          message: Reachable on the network now.
+          color: "#5DB7E8"
+
+  - id: tv_bedtime_nudge
+    alias: "TV · bedtime nudge"
+    description: At 00:20, a heads-up that the TV sleeps after 00:30 once nothing plays.
+    triggers:
+      - trigger: time
+        at: "00:20:00"
+    actions:
+      - action: script.tv_popup
+        data:
+          title: It's 00:20
+          message: The TV goes to sleep after 00:30 once nothing has played for 45 minutes.
+          color: "#A98BFF"
+          seconds: 12
+
+  - id: tv_long_watch
+    alias: "TV · three hours in a row"
+    triggers:
+      - trigger: state
+        entity_id: media_player.fire_tv
+        to: playing
+        for: { hours: 3 }
+    actions:
+      - action: script.tv_popup
+        data:
+          title: Three hours of TV
+          message: Good moment for a stretch and some water.
+          color: "#D08ADF"
+          seconds: 12
+
+  - id: tv_good_morning
+    alias: "TV · good morning"
+    description: The first time the TV comes on between 05:00 and 11:00, a morning card.
+    mode: single
+    triggers:
+      - trigger: state
+        entity_id: media_player.fire_tv
+        from: ["off", "standby"]
+    conditions:
+      - condition: time
+        after: "05:00:00"
+        before: "11:00:00"
+      - condition: template
+        value_template: >
+          {{ this.attributes.last_triggered is none or as_local(this.attributes.last_triggered).date() != now().date() }}
+    actions:
+      - delay: { seconds: 6 }
+      - action: script.tv_popup
+        data:
+          title: "Good morning"
+          message: >-
+            {{ states('weather.forecast_home') | replace('-', ' ') | capitalize }}, {{ state_attr('weather.forecast_home', 'temperature') }}° ·
+            {{ states('sensor.devices_on_wi_fi') }} devices on the Wi-Fi ·
+            knowhere {{ 'needs attention' if is_state('binary_sensor.knowhere_problem', 'on') else 'all good' }}
+          color: "#E8A84C"
+          seconds: 12

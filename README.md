@@ -11,6 +11,8 @@ Infrastructure configuration and operating documentation for the always-on Ubunt
 - Pi-hole — `pihole/compose.yaml` (running; DNS is being configured for LAN and Tailscale clients without router changes).
 - Immich v3.1.0 — `immich/compose.yaml` (started on Linux using the One Touch HDD at `/mnt/immich`; database restore count checks passed).
   - Guarded deployment script: `immich/bootstrap-linux.sh` (backs up fstab, switches the One Touch mount to read-write, restores the October 17 database dump to a fresh production DB directory, verifies counts, then starts Immich).
+- Home Assistant — `homeassistant/compose.yaml`, config copy in `homeassistant/config/`, feed collector in `homeassistant/feed/` ([docs](docs/home-assistant.md)).
+- TV viewer (ws-scrcpy) — `tv-stream/compose.yaml`, Fire TV screen in the browser over Tailscale ([docs](docs/tv-stream.md)).
 
 Systemd startup units for Jellyfin, Navidrome and qBittorrent are stored under `systemd/`.
 

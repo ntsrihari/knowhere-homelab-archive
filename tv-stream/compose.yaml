@@ -1,0 +1,13 @@
+# TV viewer in the browser, Tailscale only: http://knowhere:8765
+services:
+  tv-stream:
+    build: .
+    image: tv-stream:local
+    container_name: tv-stream
+    restart: unless-stopped
+    environment:
+      TV: 192.168.29.60:5555  # LAN: the container cannot route to Tailscale addresses
+    volumes:
+      - ./keys:/keys:ro
+    ports:
+      - "100.104.30.99:8765:8000"

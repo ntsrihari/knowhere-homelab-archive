@@ -1,0 +1,21 @@
+name: homeassistant
+
+# Home Assistant: the hub that ties the TV and the other devices together.
+# Host networking so it can discover devices on the LAN (mDNS, SSDP, the TV over ADB).
+# Web UI: http://knowhere:8123 (Tailscale) or http://192.168.29.68:8123 (home Wi-Fi).
+services:
+  homeassistant:
+    image: ghcr.io/home-assistant/home-assistant:stable
+    container_name: homeassistant
+    restart: unless-stopped
+    network_mode: host
+    environment:
+      TZ: Asia/Kolkata
+    volumes:
+      - homeassistant_config:/config
+      - /run/dbus:/run/dbus:ro
+      # Home feed (feed/collect.py): devices, presence and server health, read-only.
+      - ./feed:/feed:ro
+
+volumes:
+  homeassistant_config:

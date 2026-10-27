@@ -1,0 +1,269 @@
+title: Home control
+views:
+  - title: Home
+    path: home
+    icon: mdi:home-automation
+    type: sections
+    max_columns: 4
+    sections:
+      - type: grid
+        cards:
+          - type: heading
+            heading: Home
+            icon: mdi:home
+          - type: tile
+            entity: binary_sensor.srihari_home
+            name: Srihari
+          - type: tile
+            entity: binary_sensor.knowhere_problem
+            name: knowhere
+          - type: tile
+            entity: sensor.devices_on_wi_fi
+            name: On the Wi-Fi
+          - type: tile
+            entity: sensor.tailnet_devices_online
+            name: On Tailscale
+          - type: tile
+            entity: binary_sensor.srihari_pc
+            name: srihari-pc
+          - type: tile
+            entity: script.wake_srihari_pc
+            name: Wake the PC
+            tap_action: { action: perform-action, perform_action: script.wake_srihari_pc }
+          - type: entities
+            title: Message board
+            grid_options: { columns: full }
+            entities:
+              - entity: input_text.tv_message
+                name: Type a message
+              - entity: script.tv_send_message
+                name: Show it on the TV
+          - type: weather-forecast
+            entity: weather.forecast_home
+            forecast_type: daily
+            grid_options: { columns: full }
+
+      - type: grid
+        cards:
+          - type: heading
+            heading: TV
+            icon: mdi:television
+          - type: iframe
+            url: http://knowhere:8765/
+            aspect_ratio: 62%
+            title: TV screen (tap the TV, then "H264 Converter"; Tailscale only)
+            grid_options: { columns: full }
+          - type: media-control
+            entity: media_player.fire_tv
+            grid_options: { columns: full }
+          - type: tile
+            entity: script.fire_tv_movie_night
+            name: Movie night
+            tap_action: { action: perform-action, perform_action: script.fire_tv_movie_night }
+            grid_options: { columns: full }
+          - type: tile
+            entity: script.fire_tv_open_netflix
+            name: Netflix
+            tap_action: { action: perform-action, perform_action: script.fire_tv_open_netflix }
+          - type: tile
+            entity: script.fire_tv_open_youtube
+            name: YouTube
+            tap_action: { action: perform-action, perform_action: script.fire_tv_open_youtube }
+          - type: tile
+            entity: script.fire_tv_open_hotstar
+            name: JioHotstar
+            tap_action: { action: perform-action, perform_action: script.fire_tv_open_hotstar }
+          - type: tile
+            entity: script.fire_tv_home
+            name: Home screen
+            tap_action: { action: perform-action, perform_action: script.fire_tv_home }
+          - type: tile
+            entity: script.fire_tv_hdmi_1
+            name: HDMI 1
+            tap_action: { action: perform-action, perform_action: script.fire_tv_hdmi_1 }
+          - type: tile
+            entity: script.fire_tv_hdmi_2
+            name: HDMI 2
+            tap_action: { action: perform-action, perform_action: script.fire_tv_hdmi_2 }
+          - type: tile
+            entity: script.fire_tv_hdmi_3
+            name: HDMI 3
+            tap_action: { action: perform-action, perform_action: script.fire_tv_hdmi_3 }
+          - type: tile
+            entity: script.fire_tv_sleep
+            name: Sleep
+            tap_action: { action: perform-action, perform_action: script.fire_tv_sleep }
+          - type: tile
+            entity: sensor.tv_playing_today
+            name: Played today
+
+      - type: grid
+        cards:
+          - type: heading
+            heading: knowhere
+            icon: mdi:server
+          - type: gauge
+            entity: sensor.knowhere_temperature
+            name: Temperature
+            min: 20
+            max: 90
+            severity: { green: 20, yellow: 65, red: 80 }
+          - type: gauge
+            entity: sensor.knowhere_memory_used
+            name: Memory
+            severity: { green: 0, yellow: 75, red: 90 }
+          - type: gauge
+            entity: sensor.photos_disk_used
+            name: Photos disk
+            severity: { green: 0, yellow: 80, red: 90 }
+          - type: gauge
+            entity: sensor.media_disk_used
+            name: Media disk
+            severity: { green: 0, yellow: 80, red: 90 }
+          - type: tile
+            entity: sensor.services_down
+            name: Services down
+          - type: tile
+            entity: sensor.system_disk_used
+            name: System disk
+          - type: markdown
+            grid_options: { columns: full }
+            content: >-
+              {% set cs = state_attr('sensor.home_feed', 'containers') or [] %}
+              {% for c in cs %}{{ '🟢' if c.state == 'running' and c.health != 'unhealthy' else '🔴' }} **{{ c.name }}** · {{ c.status }}
+
+              {% endfor %}
+
+      - type: grid
+        cards:
+          - type: heading
+            heading: Electricity (estimated)
+            icon: mdi:lightning-bolt
+          - type: gauge
+            entity: sensor.home_power
+            name: Using now
+            min: 0
+            max: 1500
+            unit: W
+          - type: tile
+            entity: sensor.msedcl_today
+            name: Today
+          - type: tile
+            entity: sensor.msedcl_this_month
+            name: This month
+          - type: tile
+            entity: sensor.msedcl_bill_estimate
+            name: Bill so far
+          - type: tile
+            entity: sensor.bill_forecast_this_month
+            name: Bill forecast
+          - type: tile
+            entity: sensor.msedcl_price_per_unit
+            name: Next unit costs
+          - type: tile
+            entity: sensor.tv_this_month
+            name: TV this month
+          - type: statistics-graph
+            title: Units per day
+            chart_type: bar
+            period: day
+            days_to_show: 14
+            stat_types: [change]
+            entities:
+              - sensor.msedcl_meter
+            grid_options: { columns: full }
+          - type: entities
+            title: Watts by device
+            grid_options: { columns: full }
+            entities:
+              - sensor.tv_power
+              - sensor.srihari_pc_power
+              - sensor.thinkpad_power
+              - sensor.knowhere_power
+              - sensor.network_boxes_power
+              - sensor.rest_of_the_house_power
+          - type: entities
+            title: Tune the estimate (once, from a real bill)
+            grid_options: { columns: full }
+            state_color: false
+            entities:
+              - input_number.watts_rest_of_house
+              - input_number.watts_tv_on
+              - input_number.watts_pc_on
+              - input_number.watts_thinkpad_on
+              - input_number.watts_knowhere_idle
+              - input_number.watts_knowhere_busy
+              - input_number.watts_network
+              - input_number.msedcl_rate_1
+              - input_number.msedcl_rate_2
+              - input_number.msedcl_rate_3
+              - input_number.msedcl_rate_4
+              - input_number.msedcl_fixed_charge
+              - input_number.msedcl_per_unit_extras
+              - input_number.msedcl_duty_percent
+
+      - type: grid
+        cards:
+          - type: heading
+            heading: Network
+            icon: mdi:lan
+          - type: tile
+            entity: binary_sensor.internet
+            name: Internet
+          - type: tile
+            entity: sensor.internet_latency
+            name: Latency
+          - type: tile
+            entity: sensor.internet_down_today
+            name: Down today
+          - type: tile
+            entity: sensor.ads_blocked_today
+            name: Ads blocked today
+          - type: tile
+            entity: sensor.ads_blocked_share
+            name: Share blocked
+          - type: tile
+            entity: sensor.dns_lookups_today
+            name: Lookups today
+          - type: history-graph
+            title: Internet latency, 24 h
+            hours_to_show: 24
+            entities:
+              - sensor.internet_latency
+            grid_options: { columns: full }
+          - type: markdown
+            title: Most blocked today
+            grid_options: { columns: full }
+            content: >-
+              {% for d in state_attr('sensor.ads_blocked_today', 'top_blocked') or [] -%}
+              {{ d.count }} · {{ d.domain }}
+
+              {% endfor %}
+          - type: markdown
+            title: Tailscale
+            grid_options: { columns: full }
+            content: >-
+              | | Device | Where |
+              |-|-|-|
+              {% for d in state_attr('sensor.home_feed', 'tailscale') or [] -%}
+              | {{ '🟢' if d.online else '⚪' }} | {{ d.name }} | {{ 'home' if d.at_home else ('away' if d.online else 'offline') }} |
+              {% endfor %}
+          - type: markdown
+            title: Wi-Fi now
+            grid_options: { columns: full }
+            content: >-
+              | Address | Device |
+              |-|-|
+              {% for d in state_attr('sensor.home_feed', 'lan') or [] -%}
+              | {{ d.ip }} | {{ d.name or ('private address' if d.private_mac else d.mac) }} |
+              {% endfor %}
+          - type: logbook
+            title: Lately
+            hours_to_show: 24
+            entities:
+              - binary_sensor.srihari_home
+              - binary_sensor.srihari_pc
+              - binary_sensor.knowhere_problem
+              - media_player.fire_tv
+              - sensor.new_devices_on_wi_fi
+            grid_options: { columns: full }

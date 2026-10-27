@@ -1,0 +1,121 @@
+# Internet health, Pi-hole ad-blocking and a family message board for the TV.
+# Data comes from the home feed (feed/collect.py on knowhere).
+
+input_text:
+  tv_message:
+    name: Message for the TV
+    icon: mdi:message-text
+    max: 200
+
+template:
+  - binary_sensor:
+      - name: Internet
+        unique_id: internet_online
+        device_class: connectivity
+        state: "{{ (state_attr('sensor.home_feed', 'internet') or {}).online | default(false) }}"
+        availability: "{{ state_attr('sensor.home_feed', 'internet') is mapping }}"
+  - sensor:
+      - name: Internet latency
+        unique_id: internet_latency
+        unit_of_measurement: ms
+        state_class: measurement
+        icon: mdi:speedometer
+        state: "{{ (state_attr('sensor.home_feed', 'internet') or {}).ms }}"
+        availability: "{{ (state_attr('sensor.home_feed', 'internet') or {}).ms is number }}"
+      - name: Internet packet loss
+        unique_id: internet_loss
+        unit_of_measurement: "%"
+        state_class: measurement
+        icon: mdi:lan-disconnect
+        state: "{{ (state_attr('sensor.home_feed', 'internet') or {}).loss_pct }}"
+        availability: "{{ (state_attr('sensor.home_feed', 'internet') or {}).loss_pct is number }}"
+      - name: Ads blocked today
+        unique_id: pihole_blocked_today
+        unit_of_measurement: lookups
+        state_class: total_increasing
+        icon: mdi:shield-check
+        state: "{{ (state_attr('sensor.home_feed', 'pihole') or {}).blocked }}"
+        availability: "{{ (state_attr('sensor.home_feed', 'pihole') or {}).blocked is number }}"
+        attributes:
+          top_blocked: "{{ (state_attr('sensor.home_feed', 'pihole') or {}).top_blocked | default([]) }}"
+      - name: Ads blocked share
+        unique_id: pihole_blocked_pct
+        unit_of_measurement: "%"
+        state_class: measurement
+        icon: mdi:percent
+        state: "{{ (state_attr('sensor.home_feed', 'pihole') or {}).blocked_pct }}"
+        availability: "{{ (state_attr('sensor.home_feed', 'pihole') or {}).blocked_pct is number }}"
+      - name: DNS lookups today
+        unique_id: pihole_queries_today
+        unit_of_measurement: lookups
+        state_class: total_increasing
+        icon: mdi:dns
+        state: "{{ (state_attr('sensor.home_feed', 'pihole') or {}).queries }}"
+        availability: "{{ (state_attr('sensor.home_feed', 'pihole') or {}).queries is number }}"
+
+sensor:
+  - platform: history_stats
+    name: Internet down today
+    unique_id: internet_down_today
+    entity_id: binary_sensor.internet
+    state: "off"
+    type: time
+    start: "{{ today_at() }}"
+    end: "{{ now() }}"
+
+script:
+  tv_send_message:
+    alias: "TV · show my message"
+    icon: mdi:message-arrow-right
+    sequence:
+      - condition: template
+        value_template: "{{ states('input_text.tv_message') | trim | length > 0 }}"
+      - action: script.tv_popup
+        data:
+          title: Message
+          message: "{{ states('input_text.tv_message') }}"
+          color: "#7AA2F7"
+          seconds: 20
+
+automation:
+  - id: internet_down_notice
+    alias: "Internet · went down"
+    description: "Notes when the internet stops answering for 2 minutes (the router may still be fine)."
+    triggers:
+      - trigger: state
+        entity_id: binary_sensor.internet
+        to: "off"
+        for: { minutes: 2 }
+    actions:
+      - action: persistent_notification.create
+        data:
+          notification_id: internet_down
+          title: Internet is down
+          message: "Since {{ now().strftime('%H:%M') }}. Router answering: {{ 'yes' if (state_attr('sensor.home_feed', 'internet') or {}).router_ok else 'no' }}."
+
+  - id: internet_back_notice
+    alias: "Internet · came back"
+    description: "When the internet returns after an outage: how long it was gone, on the TV and in Home Assistant."
+    triggers:
+      - trigger: state
+        entity_id: binary_sensor.internet
+        from: "off"
+        to: "on"
+    conditions:
+      - condition: template
+        value_template: "{{ (now() - trigger.from_state.last_changed).total_seconds() > 120 }}"
+    actions:
+      - variables:
+          mins: "{{ ((now() - trigger.from_state.last_changed).total_seconds() / 60) | round(0) | int }}"
+      - action: persistent_notification.dismiss
+        data: { notification_id: internet_down }
+      - action: persistent_notification.create
+        data:
+          title: Internet is back
+          message: "It was down for {{ mins }} minutes."
+      - action: script.tv_popup
+        data:
+          title: Internet is back
+          message: "It was down for {{ mins }} minutes."
+          color: "#4FC3A1"
+          seconds: 10

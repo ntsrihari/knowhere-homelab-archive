@@ -1,0 +1,9 @@
+{
+  "SCRCPY_LISTENS_ON_ALL_INTERFACES": false,
+  "USE_QVH_SERVER": false,
+  "INCLUDE_DEV_TOOLS": false,
+  "INCLUDE_ADB_SHELL": false,
+  "INCLUDE_FILE_LISTING": false,
+  "INCLUDE_APPL": false,
+  "INCLUDE_GOOG": true
+}

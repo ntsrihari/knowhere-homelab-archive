@@ -1,0 +1,23 @@
+- id: fire_tv_night_off
+  alias: "Fire TV · off at night when nothing is playing"
+  description: >-
+    Between 00:30 and 05:00, puts the TV to sleep once it has gone 45 minutes without playing
+    anything (fell asleep in front of it, left on a menu).
+  mode: single
+  triggers:
+    - trigger: state
+      entity_id: media_player.fire_tv
+      to: [idle, standby, "on"]
+      for: { minutes: 45 }
+    - trigger: time
+      at: "01:00:00"
+  conditions:
+    - condition: time
+      after: "00:30:00"
+      before: "05:00:00"
+    - condition: state
+      entity_id: media_player.fire_tv
+      state: [idle, standby, "on"]
+      for: { minutes: 45 }
+  actions:
+    - action: script.fire_tv_sleep

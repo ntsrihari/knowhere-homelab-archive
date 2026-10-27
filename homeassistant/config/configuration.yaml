@@ -1,0 +1,35 @@
+
+# Loads default set of integrations. Do not remove.
+default_config:
+
+# Load frontend themes from the themes folder
+frontend:
+  themes: !include_dir_merge_named themes
+
+automation: !include automations.yaml
+script: !include scripts.yaml
+scene: !include scenes.yaml
+
+# srihari-pc (Windows): online when it answers a ping over Tailscale, or on the home Wi-Fi.
+# The Windows firewall must allow ping (Echo Request) for this to read "on".
+command_line:
+  - binary_sensor:
+      name: Srihari PC
+      unique_id: srihari_pc_online
+      command: "ping -c1 -W2 100.107.202.55 >/dev/null 2>&1 || ping -c1 -W2 192.168.29.96 >/dev/null 2>&1; [ $? -eq 0 ] && echo on || echo off"
+      payload_on: "on"
+      payload_off: "off"
+      device_class: connectivity
+      scan_interval: 60
+
+homeassistant:
+  packages: !include_dir_named packages
+
+lovelace:
+  dashboards:
+    home-control:
+      mode: yaml
+      title: Home control
+      icon: mdi:home-automation
+      show_in_sidebar: true
+      filename: dashboards/home.yaml

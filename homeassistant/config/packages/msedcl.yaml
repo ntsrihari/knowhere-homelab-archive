@@ -1,0 +1,352 @@
+# Electricity, estimated automatically: no meter hardware and no typed readings.
+# Each device's power comes from whether Home Assistant sees it on (TV, PC, ThinkPad, knowhere's CPU load), plus
+# always-on network boxes and one "everything else" average for the house (fridge, fans, lights). Those are
+# integrated into kWh, summed into sensor.msedcl_meter (the Energy dashboard's grid source), and priced with
+# MSEDCL's slabs. It's an estimate: tune the watts below, ideally once from a real bill.
+# Tariff defaults are LT-I residential figures from an aggregator (Desi Utility, unverified).
+
+input_number:
+  watts_tv_on:
+    name: "TV, when on"
+    icon: mdi:television
+    unit_of_measurement: W
+    min: 0
+    max: 500
+    step: 1
+    mode: box
+    initial: 90
+  watts_pc_on:
+    name: "srihari-pc, when on"
+    icon: mdi:desktop-tower
+    unit_of_measurement: W
+    min: 0
+    max: 1000
+    step: 1
+    mode: box
+    initial: 150
+  watts_thinkpad_on:
+    name: "ThinkPad, when on"
+    icon: mdi:laptop
+    unit_of_measurement: W
+    min: 0
+    max: 300
+    step: 1
+    mode: box
+    initial: 20
+  watts_knowhere_idle:
+    name: "knowhere, idle"
+    icon: mdi:server
+    unit_of_measurement: W
+    min: 0
+    max: 300
+    step: 1
+    mode: box
+    initial: 20
+  watts_knowhere_busy:
+    name: "knowhere, fully busy"
+    icon: mdi:server
+    unit_of_measurement: W
+    min: 0
+    max: 300
+    step: 1
+    mode: box
+    initial: 50
+  watts_network:
+    name: "Router and Jio box, always on"
+    icon: mdi:router-wireless
+    unit_of_measurement: W
+    min: 0
+    max: 200
+    step: 1
+    mode: box
+    initial: 18
+  watts_rest_of_house:
+    name: "Everything else, average (fridge, fans, lights)"
+    icon: mdi:fridge
+    unit_of_measurement: W
+    min: 0
+    max: 3000
+    step: 5
+    mode: box
+    initial: 150
+  msedcl_rate_1:
+    name: "Rate 0-100 units"
+    unit_of_measurement: "₹/kWh"
+    min: 0
+    max: 30
+    step: 0.01
+    mode: box
+    initial: 3.25
+  msedcl_rate_2:
+    name: "Rate 101-300 units"
+    unit_of_measurement: "₹/kWh"
+    min: 0
+    max: 30
+    step: 0.01
+    mode: box
+    initial: 6.14
+  msedcl_rate_3:
+    name: "Rate 301-500 units"
+    unit_of_measurement: "₹/kWh"
+    min: 0
+    max: 30
+    step: 0.01
+    mode: box
+    initial: 8.45
+  msedcl_rate_4:
+    name: "Rate above 500 units"
+    unit_of_measurement: "₹/kWh"
+    min: 0
+    max: 30
+    step: 0.01
+    mode: box
+    initial: 9.56
+  msedcl_fixed_charge:
+    name: Fixed charge per month
+    unit_of_measurement: "₹"
+    min: 0
+    max: 2000
+    step: 1
+    mode: box
+    initial: 150
+  msedcl_per_unit_extras:
+    name: "FAC + wheeling per unit"
+    icon: mdi:transmission-tower
+    unit_of_measurement: "₹/kWh"
+    min: 0
+    max: 10
+    step: 0.01
+    mode: box
+    initial: 0
+  msedcl_duty_percent:
+    name: Electricity duty
+    icon: mdi:percent
+    unit_of_measurement: "%"
+    min: 0
+    max: 50
+    step: 0.5
+    mode: box
+    initial: 0
+
+template:
+  - sensor:
+      - name: TV power
+        unique_id: power_tv
+        device_class: power
+        state_class: measurement
+        unit_of_measurement: W
+        state: >
+          {% set on = states('media_player.fire_tv') not in ['off', 'standby', 'unavailable', 'unknown'] %}
+          {{ states('input_number.watts_tv_on') | float(0) if on else 0.5 }}
+      - name: srihari-pc power
+        unique_id: power_srihari_pc
+        device_class: power
+        state_class: measurement
+        unit_of_measurement: W
+        state: "{{ states('input_number.watts_pc_on') | float(0) if is_state('binary_sensor.srihari_pc', 'on') else 1 }}"
+      - name: ThinkPad power
+        unique_id: power_thinkpad
+        device_class: power
+        state_class: measurement
+        unit_of_measurement: W
+        state: >
+          {% set ts = state_attr('sensor.home_feed', 'tailscale') or [] %}
+          {% set on = ts | selectattr('name', 'equalto', 'sriharithinkpad') | selectattr('at_home') | list | count > 0 %}
+          {{ states('input_number.watts_thinkpad_on') | float(0) if on else 0 }}
+      - name: knowhere power
+        unique_id: power_knowhere
+        device_class: power
+        state_class: measurement
+        unit_of_measurement: W
+        # Linear between idle and busy by CPU load (1-minute load / cores).
+        state: >
+          {% set s = state_attr('sensor.home_feed', 'server') or {} %}
+          {% set busy = [(s.load1 | default(0)) / (s.cpus | default(4)), 1] | min %}
+          {% set lo = states('input_number.watts_knowhere_idle') | float(0) %}
+          {% set hi = states('input_number.watts_knowhere_busy') | float(0) %}
+          {{ (lo + (hi - lo) * busy) | round(1) }}
+      - name: Network boxes power
+        unique_id: power_network
+        device_class: power
+        state_class: measurement
+        unit_of_measurement: W
+        state: "{{ states('input_number.watts_network') | float(0) }}"
+      - name: Rest of the house power
+        unique_id: power_rest_of_house
+        device_class: power
+        state_class: measurement
+        unit_of_measurement: W
+        state: "{{ states('input_number.watts_rest_of_house') | float(0) }}"
+      - name: Home power
+        unique_id: power_home
+        device_class: power
+        state_class: measurement
+        unit_of_measurement: W
+        icon: mdi:home-lightning-bolt
+        state: >
+          {{ (['sensor.tv_power', 'sensor.srihari_pc_power', 'sensor.thinkpad_power', 'sensor.knowhere_power',
+               'sensor.network_boxes_power', 'sensor.rest_of_the_house_power']
+              | map('states') | map('float', 0) | sum) | round(1) }}
+
+      - name: MSEDCL meter
+        unique_id: msedcl_meter
+        device_class: energy
+        state_class: total_increasing
+        unit_of_measurement: kWh
+        icon: mdi:meter-electric
+        state: >
+          {{ (['sensor.tv_energy', 'sensor.srihari_pc_energy', 'sensor.thinkpad_energy', 'sensor.knowhere_energy',
+               'sensor.network_boxes_energy', 'sensor.rest_of_the_house_energy']
+              | map('states') | map('float', 0) | sum) | round(3) }}
+        # Only report when every part is known, so a restart can't look like the meter going backwards.
+        availability: >
+          {{ ['sensor.tv_energy', 'sensor.srihari_pc_energy', 'sensor.thinkpad_energy', 'sensor.knowhere_energy',
+              'sensor.network_boxes_energy', 'sensor.rest_of_the_house_energy']
+             | map('states') | select('is_number') | list | count == 6 }}
+      - name: MSEDCL price per unit
+        unique_id: msedcl_price_per_unit
+        unit_of_measurement: "INR/kWh"
+        icon: mdi:currency-inr
+        # The rate of the slab this month's units are in now, plus per-unit extras and duty: what the next unit costs.
+        state: >
+          {% set u = states('sensor.msedcl_this_month') | float(0) %}
+          {% set r = states('input_number.msedcl_rate_1') if u < 100 else states('input_number.msedcl_rate_2') if u < 300
+                     else states('input_number.msedcl_rate_3') if u < 500 else states('input_number.msedcl_rate_4') %}
+          {% set extra = states('input_number.msedcl_per_unit_extras') | float(0) %}
+          {% set duty = states('input_number.msedcl_duty_percent') | float(0) / 100 %}
+          {{ ((r | float(0) + extra) * (1 + duty)) | round(2) }}
+      - name: MSEDCL bill estimate
+        unique_id: msedcl_bill_estimate
+        unit_of_measurement: "₹"
+        device_class: monetary
+        icon: mdi:receipt-text
+        # Telescopic slabs: each slab's rate applies only to the units inside it.
+        state: >
+          {% set u = states('sensor.msedcl_this_month') | float(0) %}
+          {% set r1 = states('input_number.msedcl_rate_1') | float(0) %}
+          {% set r2 = states('input_number.msedcl_rate_2') | float(0) %}
+          {% set r3 = states('input_number.msedcl_rate_3') | float(0) %}
+          {% set r4 = states('input_number.msedcl_rate_4') | float(0) %}
+          {% set energy = [u, 100] | min * r1 + ([[u - 100, 0] | max, 200] | min) * r2
+                          + ([[u - 300, 0] | max, 200] | min) * r3 + ([u - 500, 0] | max) * r4 %}
+          {% set extra = u * states('input_number.msedcl_per_unit_extras') | float(0) %}
+          {% set duty = (energy + extra) * states('input_number.msedcl_duty_percent') | float(0) / 100 %}
+          {{ (energy + extra + duty + states('input_number.msedcl_fixed_charge') | float(0)) | round(0) }}
+        attributes:
+          units: "{{ states('sensor.msedcl_this_month') | float(0) | round(1) }}"
+          note: Estimate from device wattages and slab rates; your MSEDCL bill is the real number.
+      - name: Bill forecast this month
+        unique_id: msedcl_bill_forecast
+        unit_of_measurement: "₹"
+        device_class: monetary
+        icon: mdi:crystal-ball
+        # This month's units so far, scaled to the whole month, priced the same way.
+        state: >
+          {% set so_far = states('sensor.msedcl_this_month') | float(0) %}
+          {% set start = now().replace(day=1, hour=0, minute=0, second=0, microsecond=0) %}
+          {% set nxt = (start + timedelta(days=32)).replace(day=1) %}
+          {% set done = [(now() - start).total_seconds() / (nxt - start).total_seconds(), 0.01] | max %}
+          {% set u = so_far / done %}
+          {% set r1 = states('input_number.msedcl_rate_1') | float(0) %}
+          {% set r2 = states('input_number.msedcl_rate_2') | float(0) %}
+          {% set r3 = states('input_number.msedcl_rate_3') | float(0) %}
+          {% set r4 = states('input_number.msedcl_rate_4') | float(0) %}
+          {% set energy = [u, 100] | min * r1 + ([[u - 100, 0] | max, 200] | min) * r2
+                          + ([[u - 300, 0] | max, 200] | min) * r3 + ([u - 500, 0] | max) * r4 %}
+          {% set extra = u * states('input_number.msedcl_per_unit_extras') | float(0) %}
+          {% set duty = (energy + extra) * states('input_number.msedcl_duty_percent') | float(0) / 100 %}
+          {{ (energy + extra + duty + states('input_number.msedcl_fixed_charge') | float(0)) | round(0) }}
+        attributes:
+          units: >
+            {% set start = now().replace(day=1, hour=0, minute=0, second=0, microsecond=0) %}
+            {% set nxt = (start + timedelta(days=32)).replace(day=1) %}
+            {% set done = [(now() - start).total_seconds() / (nxt - start).total_seconds(), 0.01] | max %}
+            {{ (states('sensor.msedcl_this_month') | float(0) / done) | round(0) }}
+
+sensor:
+  # Power (W) to energy (kWh). max_sub_interval keeps steady loads counting between changes.
+  - platform: integration
+    source: sensor.tv_power
+    name: TV energy
+    unique_id: energy_tv
+    unit_prefix: k
+    method: left
+    round: 4
+    max_sub_interval: { minutes: 5 }
+  - platform: integration
+    source: sensor.srihari_pc_power
+    name: srihari-pc energy
+    unique_id: energy_srihari_pc
+    unit_prefix: k
+    method: left
+    round: 4
+    max_sub_interval: { minutes: 5 }
+  - platform: integration
+    source: sensor.thinkpad_power
+    name: ThinkPad energy
+    unique_id: energy_thinkpad
+    unit_prefix: k
+    method: left
+    round: 4
+    max_sub_interval: { minutes: 5 }
+  - platform: integration
+    source: sensor.knowhere_power
+    name: knowhere energy
+    unique_id: energy_knowhere
+    unit_prefix: k
+    method: left
+    round: 4
+    max_sub_interval: { minutes: 5 }
+  - platform: integration
+    source: sensor.network_boxes_power
+    name: Network boxes energy
+    unique_id: energy_network
+    unit_prefix: k
+    method: left
+    round: 4
+    max_sub_interval: { minutes: 5 }
+  - platform: integration
+    source: sensor.rest_of_the_house_power
+    name: Rest of the house energy
+    unique_id: energy_rest_of_house
+    unit_prefix: k
+    method: left
+    round: 4
+    max_sub_interval: { minutes: 5 }
+
+utility_meter:
+  msedcl_this_month:
+    name: MSEDCL this month
+    unique_id: msedcl_this_month
+    source: sensor.msedcl_meter
+    cycle: monthly
+  msedcl_today:
+    name: MSEDCL today
+    unique_id: msedcl_today
+    source: sensor.msedcl_meter
+    cycle: daily
+  tv_energy_this_month:
+    name: TV this month
+    unique_id: tv_energy_this_month
+    source: sensor.tv_energy
+    cycle: monthly
+
+automation:
+  - id: msedcl_bill_high
+    alias: "Electricity · this month passes 300 units"
+    description: "MSEDCL's rate jumps after 300 units; a heads-up when this month's estimate crosses it."
+    triggers:
+      - trigger: numeric_state
+        entity_id: sensor.msedcl_this_month
+        above: 300
+    actions:
+      - action: persistent_notification.create
+        data:
+          title: Over 300 units this month
+          message: "About {{ states('sensor.msedcl_this_month') | float(0) | round(0) }} units so far; estimated bill ₹{{ states('sensor.msedcl_bill_estimate') }}."
+      - action: script.tv_popup
+        data:
+          title: Over 300 units this month
+          message: "Estimated bill ₹{{ states('sensor.msedcl_bill_estimate') }}. Units above 300 cost more."
+          color: "#E5737F"
+          seconds: 12

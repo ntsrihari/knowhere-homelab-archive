@@ -7,3 +7,9 @@ secrets/
 backups/
 *.sql
 *.dump
+
+# Home feed data (device lists, MAC addresses) and the TV viewer key and source clone
+homeassistant/feed/*.json
+homeassistant/compose.yaml.bak
+tv-stream/keys/
+tv-stream/src/
