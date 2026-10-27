@@ -13,3 +13,7 @@ homeassistant/feed/*.json
 homeassistant/compose.yaml.bak
 tv-stream/keys/
 tv-stream/src/
+
+# MeshCentral data (keys, certificates, database)
+meshcentral/data/*
+!meshcentral/data/config.json

@@ -12,6 +12,7 @@ Infrastructure configuration and operating documentation for the always-on Ubunt
 - Immich v3.1.0 — `immich/compose.yaml` (started on Linux using the One Touch HDD at `/mnt/immich`; database restore count checks passed).
   - Guarded deployment script: `immich/bootstrap-linux.sh` (backs up fstab, switches the One Touch mount to read-write, restores the October 17 database dump to a fresh production DB directory, verifies counts, then starts Immich).
 - Home Assistant — `homeassistant/compose.yaml`, config copy in `homeassistant/config/`, feed collector in `homeassistant/feed/` ([docs](docs/home-assistant.md)).
+- MeshCentral — `meshcentral/compose.yaml`, live screens of my PCs and phones over Tailscale ([docs](docs/meshcentral.md)).
 - TV viewer (ws-scrcpy) — `tv-stream/compose.yaml`, Fire TV screen in the browser over Tailscale ([docs](docs/tv-stream.md)).
 
 Systemd startup units for Jellyfin, Navidrome and qBittorrent are stored under `systemd/`.

@@ -48,8 +48,14 @@ views:
           - type: heading
             heading: TV
             icon: mdi:television
+          - type: markdown
+            title: All my screens
+            grid_options: { columns: full }
+            content: >-
+              **[Open MeshCentral](https://100.104.30.99:4430)** — live screen and control of every PC, laptop and
+              Android phone with the agent installed (Tailscale only; accept the certificate warning once).
           - type: iframe
-            url: http://knowhere:8765/
+            url: http://100.104.30.99:8765/
             aspect_ratio: 62%
             title: TV screen (tap the TV, then "H264 Converter"; Tailscale only)
             grid_options: { columns: full }

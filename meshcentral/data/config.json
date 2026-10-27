@@ -1,0 +1,22 @@
+{
+  "$schema": "https://raw.githubusercontent.com/Ylianst/MeshCentral/master/meshcentral-config-schema.json",
+  "settings": {
+    "cert": "100.104.30.99",
+    "port": 4430,
+    "portBind": "100.104.30.99",
+    "redirPort": 0,
+    "mpsPort": 0,
+    "allowFraming": true,
+    "WANonly": true,
+    "selfUpdate": false,
+    "plugins": {
+      "enabled": false
+    }
+  },
+  "domains": {
+    "": {
+      "title": "knowhere devices",
+      "newAccounts": true
+    }
+  }
+}
